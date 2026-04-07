@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanScope | Borsa Takip</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h2>FinanScope</h2>
+            <div class="watchlist">
+                <h3>İzleme Listesi</h3>
+                <ul id="stock-list">
+                    <li onclick="updateChart('THYAO.IS')">THYAO.IS <span class="price">285.50</span></li>
+                    <li onclick="updateChart('BTC-USD')">BTC-USD <span class="price">65,400</span></li>
+                    <li onclick="updateChart('XU100')">XU100 <span class="price">9,120</span></li>
+                </ul>
+            </div>
+            <button class="add-btn" onclick="openModal()">+ Varlık Ekle</button>
+        </aside>
+
+        <div class="theme-switch-wrapper">
+    <label class="theme-switch" for="checkbox">
+        <input type="checkbox" id="checkbox" />
+        <div class="slider round"></div>
+    </label>
+    <span id="theme-text">Karanlık Mod</span>
+</div>
+
+        <main class="main-content">
+            <header>
+                <h1 id="active-symbol">THYAO.IS</h1>
+                <div class="timeframe">
+                    <button>1G</button>
+                    <button class="active">1H</button>
+                    <button>1A</button>
+                </div>
+            </header>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+                <div class="placeholder-chart">Grafik Verisi Yükleniyor...</div>
+            </div>
+        </main>
+
+        <section class="portfolio-summary">
+            <h3>Portföy Özeti</h3>
+            <div class="summary-card">
+                <p>Toplam Varlık</p>
+                <h2 id="total-assets">₺145,200</h2>
+            </div>
+            <div class="summary-card profit">
+                <p>Günlük Kâr/Zarar</p>
+                <h2>+1.25%</h2>
+            </div>
+            <div class="asset-details">
+                <h4>Varlıklarım</h4>
+                <div id="user-assets">
+                    </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="assetModal" class="modal">
+        <div class="modal-content">
+            <h3>Yeni Varlık Ekle</h3>
+            <input type="text" placeholder="Sembol (Örn: BTC)">
+            <input type="number" placeholder="Adet">
+            <input type="number" placeholder="Alış Fiyatı">
+            <button onclick="closeModal()">Kaydet</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

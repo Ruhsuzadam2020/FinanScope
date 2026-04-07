@@ -1,0 +1,166 @@
+/* 1. Değişken Tanımlamaları: Aydınlık Tema (Varsayılan) */
+:root {
+    --bg-color: #f8fafc;
+    --sidebar-bg: #ffffff;
+    --card-bg: #ffffff;
+    --text-main: #1e293b;
+    --border-color: #e2e8f0;
+    --accent: #38bdf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --transition-speed: 0.3s;
+}
+
+/* 2. Karanlık Tema Tanımlamaları  */
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    --sidebar-bg: #1e293b;
+    --card-bg: #1e293b;
+    --text-main: #f8fafc;
+    --border-color: #334155;
+}
+
+/* 3. Genel Yapı */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-family: 'Inter', -apple-system, sans-serif;
+    margin: 0;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden; /* Sayfa kaymasını engelle, paneller kendi içinde kaysın */
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+.container {
+    display: grid;
+    /* Sol Menü (250px) - Ana Alan (Esnek) - Sağ Portföy (300px) */
+    grid-template-columns: 250px 1fr 320px;
+    grid-template-rows: 100vh;
+    width: 100%;
+}
+
+/* 4. Sidebar (Sol Menü) */
+.sidebar {
+    background-color: var(--sidebar-bg);
+    padding: 20px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.watchlist ul {
+    list-style: none;
+    padding: 0;
+}
+
+.watchlist li {
+    padding: 12px;
+    background: var(--bg-color);
+    margin-bottom: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid var(--border-color);
+    font-size: 14px;
+}
+
+/* 5. Ana İçerik (Grafik Alanı)  */
+.main-content {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.chart-container {
+    background: var(--card-bg);
+    flex-grow: 1; /* Grafiğin boşluğu doldurmasını sağlar */
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+}
+
+/* 6. Portföy Özeti (Sağ Panel) [cite: 67] */
+.portfolio-summary {
+    background-color: var(--sidebar-bg);
+    padding: 20px;
+    border-left: 1px solid var(--border-color);
+    overflow-y: auto; /* Varlıklar çoksa kaydırılabilir yap */
+}
+
+.summary-card {
+    background: var(--bg-color);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+}
+
+.text-green { color: var(--green); font-weight: bold; }
+.text-red { color: var(--red); font-weight: bold; }
+
+/* 7. Modal ve Butonlar */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 16px;
+    width: 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-content input {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-main);
+}
+
+.add-btn {
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.add-btn:hover { opacity: 0.9; }
+
+/* 8. Tema Switcher */
+.theme-switch-wrapper {
+    margin-top: auto; /* Sidebar'ın en altına iter */
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
