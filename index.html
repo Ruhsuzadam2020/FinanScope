@@ -7,24 +7,34 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
  
-<script type="module">
+<!-- Firebase Başlatma Bloğu -->
+  <script type="module">
     import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore }     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
  
     async function initFirebase() {
       try {
-        // Firebase config bilgilerini GÜVENLİ bir şekilde kendi backendimizden alıyoruz
-        // Eskisi: const response = await fetch('/api/firebase-config');
-const response = await fetch('https://finanscope.onrender.com//api/firebase-config');
+        // DİKKAT: Buradaki linki KENDİ Render URL'in ile değiştirmeyi unutma!
+        const response = await fetch('https://finanscope.onrender.com/api/firebase-config');
+        
+        if (!response.ok) throw new Error("Firebase ayarları sunucudan alınamadı!");
+        
         const firebaseConfig = await response.json();
+
+        // Eğer Render'a env değişkenlerini eksik girdiysen uyarı verecek
+        if (!firebaseConfig.apiKey) {
+           console.error("🔥 Firebase şifreleri Render'dan boş geliyor! Render Environment Variables kısmını kontrol et.");
+           return;
+        }
 
         const app = initializeApp(firebaseConfig);
         window.fbAuth     = getAuth(app);
         window.fbDb       = getFirestore(app);
         window.fbProvider = new GoogleAuthProvider();
+        console.log("🔥 Firebase başarıyla bağlandı!");
       } catch (e) {
-        console.warn('Firebase başlatılamadı:', e);
+        console.error('🔥 Firebase başlatılamadı:', e);
       }
     }
     initFirebase();
