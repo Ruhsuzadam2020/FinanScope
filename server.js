@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 app.use(cors());
@@ -22,21 +23,23 @@ app.get('/api/firebase-config', (req, res) => {
   });
 });
 
-// 3. Gemini AI Endpoint'i
 app.post('/api/ai-analyze', async (req, res) => {
   const { prompt } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY;
-  // DÜZELTME: Sadece 'gemini-1.5-flash' kullanıyoruz (En kararlı sürüm)
-  // server.js içindeki doğru Gemini URL'si:
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   try {
-    const response = await axios.post(url, {
-      contents: [{ parts: [{ text: prompt }] }]
+    // SDK, .env dosyasındaki GEMINI_API_KEY değerini otomatik olarak tanır!
+    const ai = new GoogleGenAI({});
+
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash", // En stabil ve hızlı model
+      contents: prompt,
     });
-    res.json(response.data);
+
+    // Artık o karmaşık "candidates[0]..." yapısı yerine direkt metni gönderiyoruz
+    res.json({ text: response.text });
+    
   } catch (error) {
-    console.error("Gemini API Hatası:", error?.response?.data || error.message);
+    console.error("Gemini SDK Hatası:", error);
     res.status(500).json({ error: 'AI hatası oluştu' });
   }
 });
