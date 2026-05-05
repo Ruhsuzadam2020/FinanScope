@@ -26,8 +26,8 @@ app.get('/api/firebase-config', (req, res) => {
 app.post('/api/ai-analyze', async (req, res) => {
   const { prompt } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
- // DÜZELTME: Model ismine -latest eklendi
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  // DÜZELTME: Sadece 'gemini-1.5-flash' kullanıyoruz (En kararlı sürüm)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   try {
     const response = await axios.post(url, {
@@ -46,12 +46,21 @@ app.get('/api/proxy/yahoo', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'URL gerekli' });
     
-    // Yahoo'nun bizi bot sanıp engellememesi için User-Agent ekliyoruz
+    // DEDEKTİF: Terminalde hangi hatalı linkin arandığını bize söyleyecek
+    console.log("Yahoo'da Aranan URL:", url); 
+
     const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'application/json'
+      }
     });
     res.json(response.data);
   } catch (error) {
+    if (error.response && error.response.status === 404) {
+       console.warn("Yahoo bu sembolü bulamadı (404).");
+       return res.status(404).json({ error: 'Sembol bulunamadı' });
+    }
     console.error("Yahoo Proxy Hatası:", error.message);
     res.status(500).json({ error: 'Veri çekilemedi' });
   }
