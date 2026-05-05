@@ -27,7 +27,8 @@ app.post('/api/ai-analyze', async (req, res) => {
   const { prompt } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
   // DÜZELTME: Sadece 'gemini-1.5-flash' kullanıyoruz (En kararlı sürüm)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // server.js içindeki doğru Gemini URL'si:
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   try {
     const response = await axios.post(url, {
