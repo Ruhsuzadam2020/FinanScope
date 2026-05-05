@@ -38,16 +38,18 @@ function toast(msg, type = 'info') {
 }
 
 
-async function proxyFetch(url, attempt = 0) {
-  if (attempt >= PROXY_MAX_RETRIES) return null;
-  const proxy = PROXIES[attempt % PROXIES.length];
+async function proxyFetch(targetUrl) {
   try {
-    const r = await fetch(proxy + encodeURIComponent(url));
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    return data.contents ? JSON.parse(data.contents) : data;
+    // DİKKAT: Buraya KENDİ Render linkini yazmalısın!
+    const renderUrl = 'https://finanscope.onrender.com';
+    
+    const r = await fetch(`${renderUrl}/api/proxy/yahoo?url=${encodeURIComponent(targetUrl)}`);
+    if (!r.ok) throw new Error('Sunucu proxy hatası');
+    
+    return await r.json();
   } catch (e) {
-    return proxyFetch(url, attempt + 1);
+    console.error('Veri çekme hatası:', e);
+    return null;
   }
 }
 

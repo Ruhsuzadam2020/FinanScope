@@ -39,7 +39,22 @@ app.post('/api/ai-analyze', async (req, res) => {
   }
 });
 
-// 4. CollectAPI Proxy (Haberler)
+// Yahoo Finance İçin Özel Backend Proxy'miz
+app.get('/api/proxy/yahoo', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ error: 'URL gerekli' });
+    
+    // Yahoo'nun bizi bot sanıp engellememesi için User-Agent ekliyoruz
+    const response = await axios.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Yahoo Proxy Hatası:", error.message);
+    res.status(500).json({ error: 'Veri çekilemedi' });
+  }
+});
 app.get('/api/news', async (req, res) => {
   try {
     const response = await axios.get("https://api.collectapi.com/news/getNews?country=tr&tag=economy", {
