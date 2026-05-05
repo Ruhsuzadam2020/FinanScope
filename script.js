@@ -277,12 +277,22 @@ function renderMarkets({ endpoints, results }) {
     const rows = sec.items.map(item => {
       let displayName = item.text || item.name;
       
-      // DÜZELTME 1: BIST için item.code (örn: ASELS) öncelikli olmalı, yoksa hatalı isimle arama yapar
-      let clickSym = item._sym || item.code || (sec.key === 'cripto' ? (CRYPTO_MAP[displayName] || displayName + '-USD') : displayName);
+      // DÜZELTME: Kripto verilerindeki item.code çakışmasını engelliyoruz
+      let clickSym = item._sym;
+      if (!clickSym) {
+        if (sec.key === 'cripto') {
+          // Kripto ise sonuna -USD ekle (Örn: BTC-USD)
+          clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
+        } else if (sec.key === 'bist') {
+          // BIST ise hisse kodunu al (Örn: ASELS)
+          clickSym = item.code || displayName;
+        } else {
+          clickSym = displayName;
+        }
+      }
       
       let rawPrice = item.lastprice || item.buying || item.price || '-';
       
-      // DÜZELTME 2: Kripto verilerinde oranlar genellikle 'changeDay' olarak gelir
       let rateText = item.rate || item.change || item.changeDay || '0.00';
       let rate = parseFloat(rateText);
       
@@ -355,11 +365,16 @@ function selectSymbol(sym) {
 // ── CHART ─────────────────────────────────────────────────────
 async function updateChart(symbol) {
   let sym = symbol.trim().toUpperCase();
-  // Otomatik .IS ekleme mantığı
-  if (!sym.includes('.') && !sym.includes('=') && !sym.includes('-') && !sym.match(/[A-Z]{3}-[A-Z]{3}/)) {
+  // DÜZELTME: En popüler kriptoları manuel yazdık ki "BTC" gelirse doğrudan BTC-USD yapsın
+  const cryptoList = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'AVAX', 'DOGE', 'TRX', 'DOT'];
+  
+  if (cryptoList.includes(sym)) {
+    sym += '-USD';
+  } 
+  // Sadece gerçek hisseler için .IS ekle
+  else if (!sym.includes('.') && !sym.includes('=') && !sym.includes('-') && !sym.match(/[A-Z]{3}-[A-Z]{3}/)) {
     sym += '.IS';
   }
-
   currentSym = sym;
   showView('analysis-view');
 

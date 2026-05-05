@@ -26,7 +26,8 @@ app.get('/api/firebase-config', (req, res) => {
 app.post('/api/ai-analyze', async (req, res) => {
   const { prompt } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+ // DÜZELTME: Model ismine -latest eklendi
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
   try {
     const response = await axios.post(url, {
