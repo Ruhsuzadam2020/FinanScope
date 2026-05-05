@@ -1,77 +1,544 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinanScope | Borsa Takip</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <aside class="sidebar">
-            <h2>FinanScope</h2>
-            <div class="watchlist">
-                <h3>İzleme Listesi</h3>
-                <ul id="stock-list">
-                    <li onclick="updateChart('THYAO.IS')">THYAO.IS <span class="price">285.50</span></li>
-                    <li onclick="updateChart('BTC-USD')">BTC-USD <span class="price">65,400</span></li>
-                    <li onclick="updateChart('XU100')">XU100 <span class="price">9,120</span></li>
-                </ul>
-            </div>
-            <button class="add-btn" onclick="openModal()">+ Varlık Ekle</button>
-        </aside>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinanScope | Finans Terminali</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+ 
+<script type="module">
+    import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore }     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+ 
+    async function initFirebase() {
+      try {
+        // Firebase config bilgilerini GÜVENLİ bir şekilde kendi backendimizden alıyoruz
+        const response = await fetch('/api/firebase-config');
+        const firebaseConfig = await response.json();
 
-        <div class="theme-switch-wrapper">
-    <label class="theme-switch" for="checkbox">
-        <input type="checkbox" id="checkbox" />
-        <div class="slider round"></div>
-    </label>
-    <span id="theme-text">Karanlık Mod</span>
+        const app = initializeApp(firebaseConfig);
+        window.fbAuth     = getAuth(app);
+        window.fbDb       = getFirestore(app);
+        window.fbProvider = new GoogleAuthProvider();
+      } catch (e) {
+        console.warn('Firebase başlatılamadı:', e);
+      }
+    }
+    initFirebase();
+  </script>
+</head>
+ 
+<body class="news-mode">
+<div class="app-shell">
+ 
+  <!-- ══ HEADER ══════════════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo" onclick="showView('home-news-view')">
+        <div class="logo-box">F</div>
+        FinanScope
+      </div>
+      <nav class="main-nav">
+        <div class="nav-item active" data-view="home-news-view" onclick="showView('home-news-view')">Haberler</div>
+        <div class="nav-item" data-view="markets-view"    onclick="showView('markets-view')">Piyasalar</div>
+        <div class="nav-item" data-view="analysis-view"   onclick="showView('analysis-view')">Grafikler</div>
+        <div class="nav-item" data-view="analysis-view"   onclick="showView('analysis-view'); switchTab('portfolio', {target: document.querySelectorAll('.tab-btn')[0]})">Portföy</div>
+      </nav>
+    </div>
+ 
+    <!-- Arama -->
+    <div class="search-section">
+      <div class="search-inner">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Hisse, kripto veya emtia ara..." autocomplete="off" spellcheck="false">
+        <div id="search-results" class="search-dropdown"></div>
+      </div>
+    </div>
+ 
+    <div class="header-right">
+      <div id="user-profile">
+        <button class="login-trigger" onclick="openAuthModal()">Giriş Yap</button>
+      </div>
+      <label class="theme-switch" title="Karanlık Mod">
+        <input type="checkbox" id="theme-checkbox">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </header>
+ 
+  <!-- ══ TICKER ════════════════════════════════════════════════ -->
+  <div class="news-ticker">
+    <div class="ticker-label">FLAŞ</div>
+    <div class="ticker-track">
+      <div class="ticker-inner" id="ticker-inner">
+        <span class="ticker-item">Veriler yükleniyor...</span>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ══ LAYOUT ════════════════════════════════════════════════ -->
+  <div class="main-layout">
+ 
+    <!-- Sol Panel (sadece grafik/portföy modunda) -->
+    <aside class="side-panel" id="main-sidebar">
+      <div class="balance-card">
+        <div class="bl-label">Toplam Portföy Değeri</div>
+        <div class="bl-value" id="total-assets">₺0,00</div>
+        <div class="bl-sub">Güncel piyasa fiyatlarıyla</div>
+      </div>
+ 
+      <div class="tabs-bar">
+        <button class="tab-btn active" onclick="switchTab('portfolio', event)">Portföyüm</button>
+        <button class="tab-btn"        onclick="switchTab('watchlist', event)">İzleme</button>
+      </div>
+ 
+      <div id="tab-content" class="list-container"></div>
+ 
+      <button class="add-btn" onclick="openModal()">
+        <span>＋</span> Varlık Ekle
+      </button>
+    </aside>
+ 
+    <!-- İçerik Alanı -->
+    <main class="content-area">
+ 
+      <!-- ── GÖRÜNÜM 1: Haberler ──────────────────────────────── -->
+      <div id="home-news-view" class="view-container active">
+        <!-- Haber Slider -->
+        <div class="swiper mySwiper">
+          <div class="swiper-wrapper" id="news-slider-wrapper">
+            <!-- JS ile doldurulur -->
+          </div>
+          <div class="swiper-pagination"></div>
+        </div>
+ 
+        <!-- Haber Grid -->
+        <div class="card">
+          <h3 class="section-title">Günün Ekonomi Gelişmeleri</h3>
+          <div id="full-news-feed" class="news-feed-grid">
+            <!-- Skeleton -->
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+          </div>
+        </div>
+ 
+        <!-- Hızlı Analiz -->
+        <div class="discovery-section">
+          <h3 class="section-title">Hızlı Analiz</h3>
+          <div id="discovery-grid" class="chip-grid"></div>
+        </div>
+      </div>
+ 
+      <!-- ── GÖRÜNÜM 2: Piyasalar ─────────────────────────────── -->
+      <div id="markets-view" class="view-container">
+        <!-- Mini İstatistikler -->
+        <div id="mini-stats-bar" class="mini-stats-bar"></div>
+ 
+        <!-- Piyasa Grid -->
+        <div id="markets-grid" class="markets-grid">
+          <div class="loading-spinner-box" style="grid-column:1/-1">
+            <div class="spin-icon"></div>
+            <span>Piyasalar senkronize ediliyor...</span>
+          </div>
+        </div>
+      </div>
+ 
+      <!-- ── GÖRÜNÜM 3: Grafikler / Analiz ────────────────────── -->
+      <div id="analysis-view" class="view-container">
+        <div class="chart-card">
+          <!-- Grafik Üst Bar -->
+          <div class="chart-top-bar">
+            <div>
+              <div class="chart-symbol" id="active-symbol">—</div>
+              <div class="chart-fullname" id="chart-fullname"></div>
+              <div class="price-row">
+                <span class="main-price" id="active-price">—</span>
+                <span class="change-tag ct-up" id="price-change">—</span>
+              </div>
+            </div>
+            <div class="chart-btns">
+              <button class="back-btn" onclick="showView('home-news-view')">← Geri</button>
+              <button class="watchlist-btn" id="watchlist-btn" onclick="toggleWatchlist()">☆ İzlemeye Ekle</button>
+              <button class="ai-btn" onclick="openAiModal()">🤖 AI Analiz</button>
+            </div>
+          </div>
+ 
+          <!-- Zaman Dilimleri -->
+          <div class="timeframe-bar">
+            <button class="time-btn active" onclick="setTimeframe('1d','5m',event)">1G</button>
+            <button class="time-btn"        onclick="setTimeframe('5d','15m',event)">5G</button>
+            <button class="time-btn"        onclick="setTimeframe('1mo','1d',event)">1A</button>
+            <button class="time-btn"        onclick="setTimeframe('6mo','1wk',event)">6A</button>
+            <button class="time-btn"        onclick="setTimeframe('1y','1wk',event)">1Y</button>
+            <button class="time-btn"        onclick="setTimeframe('5y','1mo',event)">5Y</button>
+          </div>
+ 
+          <!-- Canvas -->
+          <div class="canvas-wrap">
+            <canvas id="mainChart"></canvas>
+            <div class="chart-loader" id="chart-loader">
+              <div class="cl-spinner"></div>
+              <span class="cl-text">Grafik verisi alınıyor...</span>
+            </div>
+          </div>
+        </div>
+ 
+        <!-- Alt Hızlı Analiz (grafik modunda da) -->
+        <div class="discovery-section">
+          <h3 class="section-title">Hızlı Analiz</h3>
+          <div class="chip-grid" id="discovery-grid-2"></div>
+        </div>
+      </div>
+ 
+    </main>
+  </div><!-- /.main-layout -->
+</div><!-- /.app-shell -->
+ 
+<!-- ══ TOAST ═══════════════════════════════════════════════════ -->
+<div id="toast-wrap" class="toast-wrap"></div>
+
+<!-- ══ PROFILE MODAL ════════════════════════════════════════════ -->
+<div id="profileModal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeProfileModal()">×</button>
+    <div class="modal-title">Profil</div>
+    <div class="profile-avatar-row">
+      <div class="profile-big-avatar" id="profile-big-avatar">U</div>
+      <div>
+        <div class="profile-name" id="profile-display-name">Kullanıcı</div>
+        <div class="profile-email" id="profile-display-email"></div>
+      </div>
+    </div>
+    <div class="profile-stats">
+      <div class="pstat"><div class="pstat-val" id="pstat-assets">0</div><div class="pstat-lbl">Portföy Varlığı</div></div>
+      <div class="pstat"><div class="pstat-val" id="pstat-watchlist">0</div><div class="pstat-lbl">İzleme</div></div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn btn-primary" onclick="syncToCloud()">☁ Buluta Kaydet</button>
+      <button class="btn" onclick="handleSignOut()">Çıkış Yap</button>
+    </div>
+  </div>
 </div>
 
-        <main class="main-content">
-            <header>
-                <h1 id="active-symbol">THYAO.IS</h1>
-                <div class="timeframe">
-                    <button>1G</button>
-                    <button class="active">1H</button>
-                    <button>1A</button>
-                </div>
-            </header>
-            <div class="chart-container">
-                <canvas id="mainChart"></canvas>
-                <div class="placeholder-chart">Grafik Verisi Yükleniyor...</div>
-            </div>
-        </main>
-
-        <section class="portfolio-summary">
-            <h3>Portföy Özeti</h3>
-            <div class="summary-card">
-                <p>Toplam Varlık</p>
-                <h2 id="total-assets">₺145,200</h2>
-            </div>
-            <div class="summary-card profit">
-                <p>Günlük Kâr/Zarar</p>
-                <h2>+1.25%</h2>
-            </div>
-            <div class="asset-details">
-                <h4>Varlıklarım</h4>
-                <div id="user-assets">
-                    </div>
-            </div>
-        </section>
+<!-- ══ AI ANALİZ MODAL ═══════════════════════════════════════════ -->
+<div id="aiModal" class="modal">
+  <div class="modal-box ai-modal-box">
+    <button class="modal-close" onclick="closeAiModal()">×</button>
+    <div class="modal-title">🤖 AI Hisse Analizi</div>
+    <p class="modal-sub" id="ai-modal-symbol-label">Sembol seçilmedi</p>
+    <div class="ai-chat-area" id="ai-chat-area">
+      <div class="ai-welcome">
+        <div class="ai-welcome-icon">📊</div>
+        <p>Bir hisse senedi, kripto veya döviz seçin ve AI'dan analiz isteyin.</p>
+      </div>
     </div>
-
-    <div id="assetModal" class="modal">
-        <div class="modal-content">
-            <h3>Yeni Varlık Ekle</h3>
-            <input type="text" placeholder="Sembol (Örn: BTC)">
-            <input type="number" placeholder="Adet">
-            <input type="number" placeholder="Alış Fiyatı">
-            <button onclick="closeModal()">Kaydet</button>
-        </div>
+    <div class="ai-quick-btns" id="ai-quick-btns"></div>
+    <div class="ai-input-row">
+      <input type="text" id="ai-input" class="form-input" placeholder="Soru sorun... (örn: Bu hisse alınır mı?)" autocomplete="off">
+      <button class="btn btn-primary ai-send-btn" onclick="sendAiMessage()">Gönder</button>
     </div>
+  </div>
+</div>
+ 
+<!-- ══ AUTH MODAL ══════════════════════════════════════════════ -->
+<div id="authModal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAuthModal()">×</button>
+    <div class="modal-title">FinanScope'a Hoş Geldiniz</div>
+    <p class="modal-sub">Portföyünüzü bulutta yedeklemek için giriş yapın.</p>
+ 
+    <div class="auth-options">
+      <button class="google-btn" onclick="handleGoogleLogin()">
+        <span class="g-icon">G</span>
+        Google ile Devam Et
+      </button>
+ 
+      <div class="divider">veya</div>
+ 
+      <div class="form-group">
+        <label class="form-label">E-posta Adresi</label>
+        <input type="email" id="auth-email" class="form-input" placeholder="ornek@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Şifre</label>
+        <input type="password" id="auth-pass" class="form-input" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="handleEmailLogin()">Giriş Yap / Kayıt Ol</button>
+    </div>
+ 
+    <button class="close-text-btn" onclick="closeAuthModal()">Kapat</button>
+  </div>
+</div>
+ 
+<!-- ══ ASSET MODAL ══════════════════════════════════════════════ -->
+<div id="assetModal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-title">Portföye Varlık Ekle</div>
+    <p class="modal-sub">Hisse, kripto veya döviz sembolü girin.</p>
+ 
+    <div class="form-group">
+      <label class="form-label">Sembol</label>
+      <input type="text" id="modal-symbol" class="form-input" placeholder="Örn: THYAO.IS, BTC-USD">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Adet / Miktar</label>
+      <input type="number" id="modal-amount" class="form-input" placeholder="10" min="0" step="any">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ortalama Maliyet (₺) — opsiyonel</label>
+      <input type="number" id="modal-price" class="form-input" placeholder="150.00" min="0" step="any">
+    </div>
+ 
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">İptal</button>
+      <button class="btn btn-primary" onclick="addNewAsset()">Portföye Ekle</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- ══ LİBRARİES ═══════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+ 
+<!-- ══ APP ═════════════════════════════════════════════════════ -->
+<script src="script.js"></script>
+ 
+<!-- Auth handlers (Firebase ile) -->
+<script>
+  async function handleGoogleLogin() {
+    if (!window.fbAuth || !window.fbProvider) {
+      toast('Firebase yapılandırması eksik. Yerel mod aktif.', 'error');
+      closeAuthModal();
+      return;
+    }
+    try {
+      const { signInWithRedirect } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      closeAuthModal();
+      toast('Google\'a yönlendiriliyorsunuz...', 'info');
+      await signInWithRedirect(window.fbAuth, window.fbProvider);
+    } catch (e) {
+      toast('Giriş başarısız: ' + (e.message || e), 'error');
+    }
+  }
 
-    <script src="script.js"></script>
+  // Handle redirect result on page load
+  (async () => {
+    if (!window.fbAuth) return;
+    try {
+      const { getRedirectResult } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      const result = await getRedirectResult(window.fbAuth);
+      if (result?.user) {
+        const user = result.user;
+        setUserProfile(user);
+        toast(`Hoş geldin, ${user.displayName || user.email}!`, 'success');
+        await syncFromCloud(user.uid);
+      }
+    } catch (e) {
+      console.warn('Redirect result error:', e.message);
+    }
+  })();
+ 
+  async function handleEmailLogin() {
+    if (!window.fbAuth) {
+      toast('Firebase yapılandırması eksik.', 'error');
+      return;
+    }
+    const email = document.getElementById('auth-email').value.trim();
+    const pass  = document.getElementById('auth-pass').value;
+    if (!email || !pass) { toast('E-posta ve şifre gerekli', 'error'); return; }
+    try {
+      const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      let user;
+      try {
+        const r = await signInWithEmailAndPassword(window.fbAuth, email, pass);
+        user = r.user;
+      } catch {
+        const r = await createUserWithEmailAndPassword(window.fbAuth, email, pass);
+        user = r.user;
+        toast('Hesap oluşturuldu!', 'success');
+      }
+      setUserProfile(user);
+      closeAuthModal();
+      await syncFromCloud(user.uid);
+    } catch (e) {
+      toast('Hata: ' + (e.message || e), 'error');
+    }
+  }
+
+  function setUserProfile(user) {
+    const initial = user.displayName?.charAt(0) || user.email?.charAt(0).toUpperCase() || 'U';
+    document.getElementById('user-profile').innerHTML =
+      `<div class="user-avatar" title="${user.email}" onclick="openProfileModal('${user.uid}','${user.displayName || user.email}','${user.email}')">${initial}</div>`;
+  }
+ 
+  // Cloud sync
+  async function syncToCloud() {
+    if (!window.fbDb || !window.fbAuth?.currentUser) {
+      toast('Buluta kaydetmek için giriş yapın', 'error'); return;
+    }
+    try {
+      const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+      const uid = window.fbAuth.currentUser.uid;
+      await setDoc(doc(window.fbDb, 'users', uid), {
+        assets: JSON.parse(localStorage.getItem('fs_assets') || '[]'),
+        watchlist: JSON.parse(localStorage.getItem('fs_watchlist') || '[]'),
+        updatedAt: new Date().toISOString()
+      });
+      toast('Portföy ve izleme listesi buluta kaydedildi ✓', 'success');
+    } catch (e) {
+      toast('Kayıt hatası: ' + e.message, 'error');
+    }
+  }
+
+  async function syncFromCloud(uid) {
+    if (!window.fbDb) return;
+    try {
+      const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+      const snap = await getDoc(doc(window.fbDb, 'users', uid));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.assets?.length)    { localStorage.setItem('fs_assets', JSON.stringify(d.assets)); }
+        if (d.watchlist?.length) { localStorage.setItem('fs_watchlist', JSON.stringify(d.watchlist)); }
+        // Reload state
+        window.myAssets  = JSON.parse(localStorage.getItem('fs_assets') || '[]');
+        window.watchlist = JSON.parse(localStorage.getItem('fs_watchlist') || '[]');
+        if (typeof renderList === 'function') renderList();
+        toast('Verileriniz buluttan senkronize edildi ✓', 'success');
+      }
+    } catch (e) {
+      console.warn('Cloud sync error:', e.message);
+    }
+  }
+
+  async function handleSignOut() {
+    if (!window.fbAuth) return;
+    try {
+      const { signOut } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      await signOut(window.fbAuth);
+      document.getElementById('user-profile').innerHTML = `<button class="login-trigger" onclick="openAuthModal()">Giriş Yap</button>`;
+      closeProfileModal();
+      toast('Çıkış yapıldı', 'info');
+    } catch(e) { toast('Çıkış hatası: ' + e.message, 'error'); }
+  }
+
+  // Profile modal
+  function openProfileModal(uid, name, email) {
+    document.getElementById('profile-big-avatar').textContent = (name || email || 'U').charAt(0).toUpperCase();
+    document.getElementById('profile-display-name').textContent = name || email || 'Kullanıcı';
+    document.getElementById('profile-display-email').textContent = email || '';
+    document.getElementById('pstat-assets').textContent = (JSON.parse(localStorage.getItem('fs_assets') || '[]')).length;
+    document.getElementById('pstat-watchlist').textContent = (JSON.parse(localStorage.getItem('fs_watchlist') || '[]')).length;
+    document.getElementById('profileModal').classList.add('open');
+  }
+  function closeProfileModal() { document.getElementById('profileModal').classList.remove('open'); }
+
+  // ── AI MODAL ────────────────────────────────────────────
+  const AI_QUICK = [
+    'Genel analiz yap',
+    'Teknik görünüm nedir?',
+    'Alınır mı, satılır mı?',
+    'Risk faktörleri neler?',
+  ];
+  let aiMessages = [];
+
+  function openAiModal() {
+    const sym = window.currentSym || '—';
+    document.getElementById('ai-modal-symbol-label').textContent = `Aktif sembol: ${sym}`;
+    const qBtns = document.getElementById('ai-quick-btns');
+    if (qBtns) qBtns.innerHTML = AI_QUICK.map(q =>
+      `<button class="ai-quick-chip" onclick="askAiQuick('${q}')">${q}</button>`
+    ).join('');
+    document.getElementById('aiModal').classList.add('open');
+    document.getElementById('ai-input').focus();
+  }
+  function closeAiModal() { document.getElementById('aiModal').classList.remove('open'); }
+
+  function askAiQuick(q) { document.getElementById('ai-input').value = q; sendAiMessage(); }
+
+async function sendAiMessage() {
+  const input = document.getElementById('ai-input');
+  const userMsg = input.value.trim();
+  if (!userMsg) return;
+  input.value = '';
+
+  const sym = window.currentSym || 'bilinmeyen sembol';
+  const price = document.getElementById('active-price')?.textContent || '';
+  const change = document.getElementById('price-change')?.textContent || '';
+
+  appendAiMsg('user', userMsg);
+  appendAiMsg('assistant', null);
+
+  const prompt = `Sen bir finans asistanısın. Şu an kullanıcı ${sym} sembolüne bakıyor (Fiyat: ${price}, Değişim: ${change}). Kullanıcı sorusu: ${userMsg}`;
+
+  try {
+    // Doğrudan Gemini'ye gitmek yerine KENDİ backendimize gidiyoruz! (API key gizli kalıyor)
+    const res = await fetch('/api/ai-analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+    
+    if (!res.ok) throw new Error('Sunucu hatası');
+    
+    const data = await res.json();
+    const reply = data.candidates[0].content.parts[0].text;
+    updateLastAiMsg(reply);
+  } catch(e) {
+    updateLastAiMsg('❌ Analiz alınamadı: ' + e.message);
+  }
+}
+  function appendAiMsg(role, text) {
+    const area = document.getElementById('ai-chat-area');
+    // Remove welcome on first message
+    const welcome = area.querySelector('.ai-welcome');
+    if (welcome) welcome.remove();
+
+    const div = document.createElement('div');
+    div.className = `ai-msg ai-msg-${role}`;
+    div.innerHTML = text === null
+      ? `<div class="ai-typing"><span></span><span></span><span></span></div>`
+      : escHtml(text).replace(/\n/g, '<br>');
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function updateLastAiMsg(text) {
+    const area = document.getElementById('ai-chat-area');
+    const last = area.querySelector('.ai-msg-assistant:last-child');
+    if (last) { last.innerHTML = escHtml(text).replace(/\n/g, '<br>'); }
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Enter key for AI input
+  document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('ai-input');
+    if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') sendAiMessage(); });
+
+    const chips2 = [
+      { sym: 'XU100.IS', label: 'BIST 100' },
+      { sym: 'USDTRY=X', label: 'USD/TRY' },
+      { sym: 'GAU=X',    label: 'Altın' },
+      { sym: 'BTC-USD',  label: 'Bitcoin' },
+      { sym: 'THYAO.IS', label: 'THYAO' },
+      { sym: 'GARAN.IS', label: 'GARAN' },
+      { sym: 'SASA.IS',  label: 'SASA' },
+      { sym: 'ASELS.IS', label: 'ASELS' },
+    ];
+    const g2 = document.getElementById('discovery-grid-2');
+    if (g2) g2.innerHTML = chips2.map(c => `<div class="asset-chip" onclick="updateChart('${c.sym}')">${c.label}</div>`).join('');
+  });
+</script>
+ 
 </body>
 </html>
