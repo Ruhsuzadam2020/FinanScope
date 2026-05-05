@@ -30,8 +30,9 @@ app.post('/api/ai-analyze', async (req, res) => {
     // SDK, .env dosyasındaki GEMINI_API_KEY değerini otomatik olarak tanır!
     const ai = new GoogleGenAI({});
 
+    // YENİ HALİ:
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash", // En stabil ve hızlı model
+      model: "gemini-3-flash-preview", // Google'ın yeni resmi SDK dokümanındaki model
       contents: prompt,
     });
 
