@@ -8,8 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. Frontend dosyalarını 'public' klasöründen sun
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 // 2. Firebase Ayarlarını Güvenli Şekilde Frontend'e İlet
 app.get('/api/firebase-config', (req, res) => {
