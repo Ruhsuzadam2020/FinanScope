@@ -55,7 +55,7 @@
         <div class="nav-item active" data-view="home-news-view" onclick="showView('home-news-view')">Haberler</div>
         <div class="nav-item" data-view="markets-view"    onclick="showView('markets-view')">Piyasalar</div>
         <div class="nav-item" data-view="analysis-view"   onclick="showView('analysis-view')">Grafikler</div>
-        <div class="nav-item" data-view="analysis-view"   onclick="showView('analysis-view'); switchTab('portfolio', {target: document.querySelectorAll('.tab-btn')[0]})">Portföy</div>
+     <div class="nav-item" data-view="portfolio-view" onclick="showView('portfolio-view')">Portföy</div>
       </nav>
     </div>
  
@@ -204,6 +204,26 @@
         <div class="discovery-section">
           <h3 class="section-title">Hızlı Analiz</h3>
           <div class="chip-grid" id="discovery-grid-2"></div>
+        </div>
+      </div>
+
+      <!-- ── GÖRÜNÜM 4: Portföy ─────────────────────────────── -->
+      <div id="portfolio-view" class="view-container">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 class="section-title" style="margin: 0;">Portföy Özeti</h3>
+            <button class="btn btn-primary" onclick="openModal()">+ Varlık Ekle</button>
+          </div>
+          
+          <div class="balance-card" style="max-width: 350px; margin-bottom: 24px;">
+            <div class="bl-label">Toplam Portföy Değeri</div>
+            <div class="bl-value" id="portfolio-total-big">₺0,00</div>
+            <div class="bl-sub">Güncel piyasa fiyatlarıyla</div>
+          </div>
+          
+          <div class="markets-grid" id="portfolio-grid">
+            <!-- JavaScript ile doldurulacak -->
+          </div>
         </div>
       </div>
  
@@ -457,55 +477,67 @@
     'Alınır mı, satılır mı?',
     'Risk faktörleri neler?',
   ];
-  let aiMessages = [];
+  
+  let currentAiSym = ''; // Hangi hissede olduğumuzu takip etmek için
 
   function openAiModal() {
     const sym = window.currentSym || '—';
     document.getElementById('ai-modal-symbol-label').textContent = `Aktif sembol: ${sym}`;
+    
+    // Eğer farklı bir hisseye geçildiyse eski mesajları TEMİZLE
+    if (currentAiSym !== sym) {
+      document.getElementById('ai-chat-area').innerHTML = `
+        <div class="ai-welcome">
+          <div class="ai-welcome-icon">📊</div>
+          <p>Bir hisse senedi, kripto veya döviz seçin ve AI'dan analiz isteyin.</p>
+        </div>`;
+      currentAiSym = sym;
+    }
+
     const qBtns = document.getElementById('ai-quick-btns');
     if (qBtns) qBtns.innerHTML = AI_QUICK.map(q =>
       `<button class="ai-quick-chip" onclick="askAiQuick('${q}')">${q}</button>`
     ).join('');
+    
     document.getElementById('aiModal').classList.add('open');
     document.getElementById('ai-input').focus();
   }
-  function closeAiModal() { document.getElementById('aiModal').classList.remove('open'); }
 
+  function closeAiModal() { document.getElementById('aiModal').classList.remove('open'); }
   function askAiQuick(q) { document.getElementById('ai-input').value = q; sendAiMessage(); }
 
-async function sendAiMessage() {
-  const input = document.getElementById('ai-input');
-  const userMsg = input.value.trim();
-  if (!userMsg) return;
-  input.value = '';
+  async function sendAiMessage() {
+    const input = document.getElementById('ai-input');
+    const userMsg = input.value.trim();
+    if (!userMsg) return;
+    input.value = '';
 
-  const sym = window.currentSym || 'bilinmeyen sembol';
-  const price = document.getElementById('active-price')?.textContent || '';
-  const change = document.getElementById('price-change')?.textContent || '';
+    const sym = window.currentSym || 'bilinmeyen sembol';
+    const price = document.getElementById('active-price')?.textContent || '';
+    const change = document.getElementById('price-change')?.textContent || '';
+    // YENİ: AI'nin varlığın türünü anlaması için tam adını (Örn: Gram Altın, ONS) çekiyoruz.
+    const name = document.getElementById('chart-fullname')?.textContent || sym;
 
-  appendAiMsg('user', userMsg);
-  appendAiMsg('assistant', null);
+    appendAiMsg('user', userMsg);
+    appendAiMsg('assistant', null);
 
-  const prompt = `Sen bir finans asistanısın. Şu an kullanıcı ${sym} sembolüne bakıyor (Fiyat: ${price}, Değişim: ${change}). Kullanıcı sorusu: ${userMsg}`;
+    // AI'yi çok daha akıllı yönlendiren yeni prompt
+    const prompt = `Sen uzman bir finansal analistsin. Kullanıcı şu an "${name}" (${sym}) varlığını inceliyor. Güncel Fiyat: ${price}, Değişim: ${change}. Kullanıcı sorusu: "${userMsg}". Lütfen bu varlığın türünü (hisse, kripto, emtia, borsa endeksi vb.) dikkate alarak profesyonel, net ve veriye dayalı bir analiz yap.`;
 
-  try {
-    // Doğrudan Gemini'ye gitmek yerine KENDİ backendimize gidiyoruz! (API key gizli kalıyor)
-    const res = await fetch('https://finanscope.onrender.com/api/ai-analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt })
-    });
-    
-    if (!res.ok) throw new Error('Sunucu hatası');
-    
-    const data = await res.json();
-    const reply = data.text;
-    updateLastAiMsg(reply);
-  } catch(e) {
-    updateLastAiMsg('❌ Analiz alınamadı: ' + e.message);
-  }
-}
-  function appendAiMsg(role, text) {
+    try {
+      const res = await fetch('https://finanscope.onrender.com/api/ai-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt })
+      });
+      
+      if (!res.ok) throw new Error('Sunucu hatası');
+      const data = await res.json();
+      updateLastAiMsg(data.text);
+    } catch(e) {
+      updateLastAiMsg('❌ Analiz alınamadı: ' + e.message);
+    }
+  }  function appendAiMsg(role, text) {
     const area = document.getElementById('ai-chat-area');
     // Remove welcome on first message
     const welcome = area.querySelector('.ai-welcome');

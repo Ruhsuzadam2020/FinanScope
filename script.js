@@ -90,9 +90,10 @@ function showView(viewId) {
       document.body.classList.add('markets-mode');
       fetchGlobalMarkets();
     } else if (viewId === 'portfolio-view') {
-      document.body.classList.add('analysis-mode');
-      if (sidebar) sidebar.style.display = 'flex';
-      if (mainLayout) mainLayout.style.gridTemplateColumns = '288px 1fr';
+      document.body.classList.add('markets-mode'); // Geniş ekran modu
+      if (sidebar) sidebar.style.display = 'none'; // Yan paneli gizle
+      if (mainLayout) mainLayout.style.gridTemplateColumns = '1fr';
+      renderPortfolioView(); // Yeni tam ekran portföyü yükle
     }
   }
 
@@ -551,6 +552,10 @@ async function renderList() {
   const container = document.getElementById('tab-content');
   if (!container) return;
 
+  // DÜZELTME: LocalStorage'daki bozuk veya boş (null) verileri temizle
+  watchlist = watchlist.filter(s => s && typeof s === 'string' && s.trim() !== '');
+  myAssets = myAssets.filter(a => a && a.symbol);
+
   const items = currentTab === 'portfolio'
     ? myAssets
     : watchlist.map(s => ({ symbol: s, amount: 0, avgPrice: 0 }));
@@ -561,40 +566,51 @@ async function renderList() {
     return;
   }
 
-  // Skeleton while loading
   container.innerHTML = items.map(() => `<div class="skeleton sk-row"></div>`).join('');
-
   let total = 0;
+
+  // Promise.all içine try-catch ekliyoruz ki biri patlarsa hepsi patlamasın
   const cards = await Promise.all(items.map(async item => {
-    const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
-    const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
-    const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
-    const isUp  = parseFloat(chgPct) >= 0;
-    if (currentTab === 'portfolio') total += price * item.amount;
+    try {
+      const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
+      const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
+      const isUp  = parseFloat(chgPct) >= 0;
+      if (currentTab === 'portfolio') total += price * item.amount;
 
-    const shortSym = item.symbol.replace('.IS','').replace('-USD','').replace('=X','').slice(0, 6);
-    const detailTxt = currentTab === 'portfolio'
-      ? `${item.amount} Adet · Maliyet: ${item.avgPrice > 0 ? '₺' + item.avgPrice : '-'}`
-      : '★ İzleme';
+      const shortSym = item.symbol.replace('.IS','').replace('-USD','').replace('=X','').slice(0, 6);
+      const detailTxt = currentTab === 'portfolio'
+        ? `${item.amount} Adet · Maliyet: ${item.avgPrice > 0 ? '₺' + item.avgPrice : '-'}`
+        : '★ İzleme';
 
-    const delBtn = currentTab === 'portfolio'
-      ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" title="Sil">×</button>`
-      : `<button class="pi-del" onclick="removeFromWatchlist('${item.symbol}',event)" title="Çıkar">×</button>`;
+      const delBtn = currentTab === 'portfolio'
+        ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" title="Sil">×</button>`
+        : `<button class="pi-del" onclick="removeFromWatchlist('${item.symbol}',event)" title="Çıkar">×</button>`;
 
-    return `
-      <div class="pi-item" onclick="updateChart('${item.symbol}')">
-        <div class="pi-icon">${shortSym}</div>
-        <div class="pi-info">
-          <div class="pi-sym">${item.symbol}</div>
-          <div class="pi-det">${detailTxt}</div>
-        </div>
-        <div class="pi-right">
-          <div class="pi-price">${formatPrice(price, item.symbol)}</div>
-          <div class="pi-chg ${isUp ? 't-up' : 't-down'}">${isUp ? '+' : ''}${chgPct}%</div>
-        </div>
-        ${delBtn}
-      </div>`;
+      return `
+        <div class="pi-item" onclick="updateChart('${item.symbol}')">
+          <div class="pi-icon">${shortSym}</div>
+          <div class="pi-info">
+            <div class="pi-sym">${item.symbol}</div>
+            <div class="pi-det">${detailTxt}</div>
+          </div>
+          <div class="pi-right">
+            <div class="pi-price">${formatPrice(price, item.symbol)}</div>
+            <div class="pi-chg ${isUp ? 't-up' : 't-down'}">${isUp ? '+' : ''}${chgPct}%</div>
+          </div>
+          ${delBtn}
+        </div>`;
+    } catch (error) {
+      // Bir veri çekilemezse listeyi çökertme, sadece hata kartı bas
+      return `
+        <div class="pi-item" style="border-left: 3px solid var(--down);">
+          <div class="pi-info"><div class="pi-sym">${item.symbol}</div><div class="pi-det" style="color:var(--down)">Veri alınamadı</div></div>
+          ${currentTab === 'portfolio' 
+            ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" style="opacity:1">×</button>` 
+            : `<button class="pi-del" onclick="removeFromWatchlist('${item.symbol}',event)" style="opacity:1">×</button>`}
+        </div>`;
+    }
   }));
 
   container.innerHTML = cards.join('');
@@ -708,6 +724,71 @@ function addNewAsset() {
   symEl.value = ''; amtEl.value = ''; priceEl.value = '';
   closeModal();
   renderList();
+}
+
+// ── YENİ: TAM EKRAN PORTFÖY YÖNETİMİ ──────────────────────────
+async function renderPortfolioView() {
+  const grid = document.getElementById('portfolio-grid');
+  const totalEl = document.getElementById('portfolio-total-big');
+  if (!grid) return;
+
+  myAssets = myAssets.filter(a => a && a.symbol); // Bozuk verileri temizle
+
+  if (!myAssets.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding: 60px 0;"><div class="es-icon" style="font-size:40px;">💼</div><p class="es-text" style="font-size:14px; margin-top:10px;">Portföyünüzde henüz varlık bulunmuyor.<br>Yukarıdaki "Varlık Ekle" butonunu kullanabilirsiniz.</p></div>`;
+    if (totalEl) totalEl.textContent = '₺0,00';
+    return;
+  }
+
+  grid.innerHTML = `<div class="loading-spinner-box" style="grid-column:1/-1"><div class="spin-icon"></div><span>Portföy hesaplanıyor...</span></div>`;
+
+  let total = 0;
+  const cards = await Promise.all(myAssets.map(async item => {
+    try {
+      const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
+      const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
+      const isUp  = parseFloat(chgPct) >= 0;
+      const cpClass = isUp ? 'cp-up' : 'cp-down';
+      const sign = isUp ? '+' : '';
+
+      const currentTotal = price * item.amount;
+      total += currentTotal;
+      const karZarar = (price - item.avgPrice) * item.amount;
+      const kzClass = karZarar >= 0 ? 't-up' : 't-down';
+
+      return `<div class="market-section-card" style="padding: 16px;">
+        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; align-items:center;">
+           <div style="font-family: var(--font-mono); font-size: 16px; font-weight: bold; cursor:pointer;" onclick="updateChart('${item.symbol}')">${item.symbol}</div>
+           <div class="change-pill ${cpClass}">${sign}%${chgPct}</div>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Miktar: <span style="color: var(--text-main); font-weight:500;">${item.amount}</span></div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Maliyet: <span style="color: var(--text-main); font-weight:500;">₺${item.avgPrice}</span></div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Güncel Fiyat: <span style="color: var(--text-main); font-weight:500;">₺${price.toLocaleString('tr-TR', {minimumFractionDigits:2})}</span></div>
+        
+        <div style="border-top: 1px solid var(--border-light); padding-top: 12px; display:flex; justify-content: space-between; align-items: center;">
+           <div>
+             <div style="font-size: 11px; color: var(--text-muted);">Toplam Değer</div>
+             <div style="font-family: var(--font-mono); font-weight: 600;">₺${currentTotal.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
+           </div>
+           <div style="text-align: right;">
+             <div style="font-size: 11px; color: var(--text-muted);">Kâr / Zarar</div>
+             <div class="${kzClass}" style="font-family: var(--font-mono); font-weight: 600;">${karZarar >= 0 ? '+' : ''}₺${karZarar.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
+           </div>
+        </div>
+        <button class="btn btn-full" style="margin-top: 12px; border-color: var(--down-bg); color: var(--down); background: var(--bg-app);" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Sat / Sil</button>
+      </div>`;
+    } catch (e) {
+      return `<div class="market-section-card" style="padding: 16px; text-align:center;">
+         <div style="color: var(--down); margin-bottom: 10px;">Veri alınamadı: ${item.symbol}</div>
+         <button class="btn" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Listeden Kaldır</button>
+      </div>`;
+    }
+  }));
+
+  grid.innerHTML = cards.join('');
+  if (totalEl) totalEl.textContent = `₺${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────
