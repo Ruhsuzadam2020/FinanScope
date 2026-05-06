@@ -1,5 +1,7 @@
 'use strict';
 
+const API_BASE = 'https://finanscope.onrender.com';
+
 const PROXIES = [
   'https://corsproxy.io/?url=',
   'https://api.allorigins.win/get?url='
@@ -48,10 +50,7 @@ function toast(msg, type = 'info') {
 
 async function proxyFetch(targetUrl) {
   try {
-    // Eski: const renderUrl = 'https://finanscope.onrender.com';
-const renderUrl = window.location.origin; // Dinamik hale getirdik
-    
-    const r = await fetch(`${renderUrl}/api/proxy/yahoo?url=${encodeURIComponent(targetUrl)}`);
+    const r = await fetch(`${API_BASE}/api/proxy/yahoo?url=${encodeURIComponent(targetUrl)}`);
     if (!r.ok) throw new Error('Sunucu proxy hatası');
     
     return await r.json();
@@ -120,7 +119,7 @@ async function fetchNews() {
   try {
     // CollectAPI yerine kendi backendimizden çekiyoruz
     // Eskisi: const r = await fetch('/api/news');
-    const r = await fetch(`${window.location.origin}/api/news`);
+    const r = await fetch(`${API_BASE}/api/news`);
     const data = await r.json();
 
     if (!data?.success || !data.result?.length) throw new Error("Veri yok");
@@ -210,7 +209,7 @@ async function fetchGlobalMarkets() {
   await Promise.all(endpoints.map(async ep => {
     try {
       // CollectAPI yerine kendi backendimizden çekiyoruz
-      const res = await fetch(`https://finanscope.onrender.com/api/economy/${ep.url}`);
+      const res = await fetch(`${API_BASE}/api/economy/${ep.url}`);
       const data = await res.json();
       if (data?.success && data.result?.length) {
         results[ep.key] = { ...ep, items: data.result.slice(0, 15) };
@@ -819,7 +818,7 @@ async function generateAiPortfolio() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${window.location.origin}/api/ai-portfolio`, {
+    const res = await fetch(`${API_BASE}/api/ai-portfolio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ budget, risk, category, duration })

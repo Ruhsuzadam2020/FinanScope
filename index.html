@@ -16,7 +16,7 @@
     async function initFirebase() {
       try {
         // DİKKAT: Buradaki linki KENDİ Render URL'in ile değiştirmeyi unutma!
-        const response = await fetch(`${window.location.origin}/api/firebase-config`);
+        const response = await fetch(`https://finanscope.onrender.com/api/firebase-config`);
         
         if (!response.ok) throw new Error("Firebase ayarları sunucudan alınamadı!");
         
@@ -602,7 +602,7 @@ async function handleSignOut() {
     const prompt = `Sen uzman bir finansal analistsin. Kullanıcı şu an "${name}" (${sym}) varlığını inceliyor. Güncel Fiyat: ${price}, Değişim: ${change}. Kullanıcı sorusu: "${userMsg}". Lütfen bu varlığın türünü (hisse, kripto, emtia, borsa endeksi vb.) dikkate alarak profesyonel, net ve veriye dayalı bir analiz yap.`;
 
     try {
-      const res = await fetch(`${window.location.origin}/api/ai-analyze`, {
+      const res = await fetch(`https://finanscope.onrender.com/api/ai-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt })
