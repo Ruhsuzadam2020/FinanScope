@@ -63,6 +63,35 @@ async function proxyFetch(targetUrl) {
     return null;
   }
 }
+// ── KUR ÇEVİRİCİ ──────────────────────────────────────────────
+// USD/EUR bazlı varlıkları TRY'ye çevirir
+let _usdTryRate = null;
+async function getUsdTry() {
+  if (_usdTryRate) return _usdTryRate;
+  try {
+    const d = await proxyFetch('https://query1.finance.yahoo.com/v8/finance/chart/USDTRY=X?range=1d&interval=1d');
+    const rate = d?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+    if (rate > 0) _usdTryRate = rate;
+    return _usdTryRate || 0;
+  } catch { return 0; }
+}
+
+// Fiyatı her zaman TRY'ye çevirir, sembol para birimini otomatik algılar
+async function getPriceInTRY(symbol, priceInNativeCurrency) {
+  if (!priceInNativeCurrency) return 0;
+  // TRY cinsinden varlıklar (BIST hisseleri, TRY döviz çiftleri)
+  if (symbol.endsWith('.IS') || symbol.includes('TRY') || symbol.includes('=F')) {
+    return priceInNativeCurrency;
+  }
+  // USD cinsinden varlıklar (BTC-USD, ETH-USD, GC=F hariç)
+  if (symbol.endsWith('-USD') || symbol.endsWith('=X') || symbol === 'BTC-USD' || symbol === 'ETH-USD') {
+    const usdtry = await getUsdTry();
+    return usdtry > 0 ? priceInNativeCurrency * usdtry : 0;
+  }
+  return priceInNativeCurrency;
+}
+
+
 
 // ── VIEW MANAGER ──────────────────────────────────────────────
 function showView(viewId) {
@@ -603,7 +632,13 @@ async function renderList() {
       const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
       const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
       const isUp  = parseFloat(chgPct) >= 0;
-      if (currentTab === 'portfolio') total += price * item.amount;
+      // Para birimini TRY'ye çevir (BTC-USD gibi dolar bazlı varlıklar için)
+      let priceTRY = price;
+      if (item.symbol.endsWith('-USD') || (item.symbol.endsWith('=X') && !item.symbol.includes('TRY'))) {
+        const usdtry = await getUsdTry();
+        if (usdtry > 0) priceTRY = price * usdtry;
+      }
+      if (currentTab === 'portfolio') total += priceTRY * item.amount;
 
       const shortSym = item.symbol.replace('.IS','').replace('-USD','').replace('=X','').slice(0, 6);
       const detailTxt = currentTab === 'portfolio'
@@ -623,6 +658,7 @@ async function renderList() {
           </div>
           <div class="pi-right">
             <div class="pi-price">${formatPrice(price, item.symbol)}</div>
+            ${(item.symbol.endsWith('-USD') && priceTRY !== price) ? `<div style="font-size:10px;color:var(--text-muted)">₺${Math.round(priceTRY).toLocaleString('tr-TR')}</div>` : ''}
             <div class="pi-chg ${isUp ? 't-up' : 't-down'}">${isUp ? '+' : ''}${chgPct}%</div>
           </div>
           ${delBtn}
@@ -781,10 +817,24 @@ async function renderPortfolioView() {
       const cpClass = isUp ? 'cp-up' : 'cp-down';
       const sign = isUp ? '+' : '';
 
-      const currentTotal = price * item.amount;
+      // Para birimini TRY'ye çevir
+      let priceTRY = price;
+      const isUsdBased = item.symbol.endsWith('-USD') || (item.symbol.endsWith('=X') && !item.symbol.includes('TRY'));
+      if (isUsdBased) {
+        const usdtry = await getUsdTry();
+        if (usdtry > 0) priceTRY = price * usdtry;
+      }
+
+      const currentTotal = priceTRY * item.amount;
       total += currentTotal;
-      const karZarar = (price - item.avgPrice) * item.amount;
+      // Maliyet de TRY bazında karşılaştır
+      const avgPriceTRY = item.avgPrice > 0 ? item.avgPrice : 0;
+      const karZarar = avgPriceTRY > 0 ? (priceTRY - avgPriceTRY) * item.amount : 0;
       const kzClass = karZarar >= 0 ? 't-up' : 't-down';
+
+      const priceDisplay = isUsdBased
+        ? `${formatPrice(price, item.symbol)} <span style="font-size:11px;color:var(--text-muted)">≈ ₺${Math.round(priceTRY).toLocaleString('tr-TR')}</span>`
+        : formatPrice(price, item.symbol);
 
       return `<div class="market-section-card" style="padding: 16px;">
         <div style="display:flex; justify-content: space-between; margin-bottom: 12px; align-items:center;">
@@ -792,17 +842,17 @@ async function renderPortfolioView() {
            <div class="change-pill ${cpClass}">${sign}%${chgPct}</div>
         </div>
         <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Miktar: <span style="color: var(--text-main); font-weight:500;">${item.amount}</span></div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Maliyet: <span style="color: var(--text-main); font-weight:500;">₺${item.avgPrice}</span></div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Güncel Fiyat: <span style="color: var(--text-main); font-weight:500;">₺${price.toLocaleString('tr-TR', {minimumFractionDigits:2})}</span></div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Maliyet: <span style="color: var(--text-main); font-weight:500;">${avgPriceTRY > 0 ? '₺' + avgPriceTRY.toLocaleString('tr-TR') : '-'}</span></div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Güncel Fiyat: <span style="color: var(--text-main); font-weight:500;">${priceDisplay}</span></div>
         
         <div style="border-top: 1px solid var(--border-light); padding-top: 12px; display:flex; justify-content: space-between; align-items: center;">
            <div>
-             <div style="font-size: 11px; color: var(--text-muted);">Toplam Değer</div>
+             <div style="font-size: 11px; color: var(--text-muted);">Toplam Değer (TRY)</div>
              <div style="font-family: var(--font-mono); font-weight: 600;">₺${currentTotal.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
            </div>
            <div style="text-align: right;">
              <div style="font-size: 11px; color: var(--text-muted);">Kâr / Zarar</div>
-             <div class="${kzClass}" style="font-family: var(--font-mono); font-weight: 600;">${karZarar >= 0 ? '+' : ''}₺${karZarar.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
+             <div class="${kzClass}" style="font-family: var(--font-mono); font-weight: 600;">${karZarar !== 0 ? (karZarar >= 0 ? '+' : '') + '₺' + karZarar.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '-'}</div>
            </div>
         </div>
         <button class="btn btn-full" style="margin-top: 12px; border-color: var(--down-bg); color: var(--down); background: var(--bg-app);" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Sat / Sil</button>
