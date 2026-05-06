@@ -224,7 +224,6 @@
         </div>
       </div>
 
-      <!-- ── GÖRÜNÜM 4: Portföy ─────────────────────────────── -->
       <div id="portfolio-view" class="view-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h3 class="section-title" style="margin: 0;">Portföy Özeti</h3>
@@ -234,10 +233,28 @@
           </div>
         </div>
 
-        <div class="balance-card" style="max-width: 350px; margin-bottom: 24px;">
-          <div class="bl-label">Toplam Portföy Değeri</div>
-          <div class="bl-value" id="portfolio-total-big">₺0,00</div>
-          <div class="bl-sub">Güncel piyasa fiyatlarıyla</div>
+        <!-- Büyük portföy özet kartı -->
+        <div class="portfolio-summary-card">
+          <div class="psc-left">
+            <div class="psc-label">Toplam Portföy Değeri</div>
+            <div class="psc-value" id="portfolio-total-big">₺0,00</div>
+            <div class="psc-sub">Güncel piyasa fiyatlarıyla</div>
+          </div>
+          <div class="psc-divider"></div>
+          <div class="psc-right">
+            <div class="psc-stat">
+              <div class="psc-stat-label">Toplam Kâr / Zarar</div>
+              <div class="psc-stat-val" id="portfolio-total-pnl">-</div>
+            </div>
+            <div class="psc-stat">
+              <div class="psc-stat-label">Toplam Getiri</div>
+              <div class="psc-stat-val" id="portfolio-total-pct">-</div>
+            </div>
+            <div class="psc-stat">
+              <div class="psc-stat-label">Varlık Sayısı</div>
+              <div class="psc-stat-val" id="portfolio-asset-count">0</div>
+            </div>
+          </div>
         </div>
 
         <div class="markets-grid" id="portfolio-grid">

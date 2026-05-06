@@ -253,17 +253,36 @@ async function fetchGlobalMarkets() {
   if (!Object.keys(results).length) {
     toast('CollectAPI erişilemedi, yedek veri yükleniyor...', 'info');
     const fallbackSymbols = [
+      // 🇹🇷 Borsa İstanbul
       { key:'bist',  sym:'XU100.IS', name:'BIST 100', icon:'🇹🇷', label:'Borsa İstanbul' },
       { key:'bist',  sym:'THYAO.IS', name:'THYAO', icon:'🇹🇷', label:'Borsa İstanbul' },
       { key:'bist',  sym:'GARAN.IS', name:'GARAN', icon:'🇹🇷', label:'Borsa İstanbul' },
       { key:'bist',  sym:'ASELS.IS', name:'ASELS', icon:'🇹🇷', label:'Borsa İstanbul' },
       { key:'bist',  sym:'SASA.IS',  name:'SASA',  icon:'🇹🇷', label:'Borsa İstanbul' },
-      { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',  icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'ETH-USD',  name:'Ethereum', icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'SOL-USD',  name:'Solana',   icon:'₿', label:'Kripto Paralar' },
-      { key:'emtia', sym:'GC=F',     name:'Altın (ONS)', icon:'🏅', label:'Altın & Emtia' },
-      { key:'emtia', sym:'EURUSD=X', name:'EUR/USD',   icon:'🏅', label:'Altın & Emtia' },
-      { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',  icon:'🏅', label:'Altın & Emtia' },
+      // 🇺🇸 ABD Piyasaları
+      { key:'us',    sym:'^GSPC',    name:'S&P 500',   icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'^DJI',     name:'Dow Jones',  icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'^IXIC',    name:'NASDAQ',     icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'AAPL',     name:'Apple',      icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'NVDA',     name:'Nvidia',     icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'TSLA',     name:'Tesla',      icon:'🇺🇸', label:'ABD Piyasaları' },
+      // 🌍 Avrupa & Asya
+      { key:'global',sym:'^FTSE',    name:'FTSE 100',  icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^GDAXI',   name:'DAX',       icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^N225',    name:'Nikkei 225',icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^HSI',     name:'Hang Seng', icon:'🌍', label:'Global Endeksler' },
+      // ₿ Kripto
+      { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',   icon:'₿', label:'Kripto Paralar' },
+      { key:'cripto',sym:'ETH-USD',  name:'Ethereum',  icon:'₿', label:'Kripto Paralar' },
+      { key:'cripto',sym:'SOL-USD',  name:'Solana',    icon:'₿', label:'Kripto Paralar' },
+      { key:'cripto',sym:'BNB-USD',  name:'BNB',       icon:'₿', label:'Kripto Paralar' },
+      { key:'cripto',sym:'XRP-USD',  name:'XRP',       icon:'₿', label:'Kripto Paralar' },
+      // 🏅 Emtia & Döviz
+      { key:'emtia', sym:'GC=F',     name:'Altın (ONS)',  icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'SI=F',     name:'Gümüş',        icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'CL=F',     name:'Ham Petrol',   icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',      icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'EURUSD=X', name:'EUR/USD',      icon:'🏅', label:'Emtia & Döviz' },
     ];
     const buckets = {};
     await Promise.all(fallbackSymbols.map(async fb => {
@@ -713,6 +732,10 @@ function initDiscovery() {
     { sym: 'ETH-USD',   label: 'Ethereum' },
     { sym: 'THYAO.IS',  label: 'THYAO' },
     { sym: 'GARAN.IS',  label: 'GARAN' },
+    { sym: '^GSPC',     label: 'S&P 500' },
+    { sym: '^IXIC',     label: 'NASDAQ' },
+    { sym: 'NVDA',      label: 'Nvidia' },
+    { sym: 'AAPL',      label: 'Apple' },
   ];
   const grid = document.getElementById('discovery-grid');
   if (grid) {
@@ -822,6 +845,8 @@ async function renderPortfolioView() {
   grid.innerHTML = `<div class="loading-spinner-box" style="grid-column:1/-1"><div class="spin-icon"></div><span>Portföy hesaplanıyor...</span></div>`;
 
   let total = 0;
+  let totalCost = 0;
+  let totalPnl = 0;
   const cards = await Promise.all(myAssets.map(async item => {
     try {
       const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
@@ -847,6 +872,10 @@ async function renderPortfolioView() {
       // Maliyet de TRY bazında karşılaştır
       const avgPriceTRY = item.avgPrice > 0 ? item.avgPrice : 0;
       const karZarar = avgPriceTRY > 0 ? (priceTRY - avgPriceTRY) * item.amount : 0;
+      if (avgPriceTRY > 0) {
+        totalCost += avgPriceTRY * item.amount;
+        totalPnl  += karZarar;
+      }
       const kzClass = karZarar >= 0 ? 't-up' : 't-down';
 
       const priceDisplay = isUsdBased
@@ -884,6 +913,26 @@ async function renderPortfolioView() {
 
   grid.innerHTML = cards.join('');
   if (totalEl) totalEl.textContent = `₺${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+
+  // Toplam kâr/zarar ve yüzde
+  const pnlEl  = document.getElementById('portfolio-total-pnl');
+  const pctEl  = document.getElementById('portfolio-total-pct');
+  const cntEl  = document.getElementById('portfolio-asset-count');
+
+  if (pnlEl) {
+    const sign = totalPnl >= 0 ? '+' : '';
+    pnlEl.textContent = totalPnl !== 0
+      ? `${sign}₺${totalPnl.toLocaleString('tr-TR', {minimumFractionDigits:2})}`
+      : '-';
+    pnlEl.className = `psc-stat-val ${totalPnl >= 0 ? 'psc-up' : 'psc-down'}`;
+  }
+  if (pctEl && totalCost > 0) {
+    const pct = ((totalPnl / totalCost) * 100).toFixed(2);
+    const sign = totalPnl >= 0 ? '+' : '';
+    pctEl.textContent = `${sign}%${pct}`;
+    pctEl.className = `psc-stat-val ${totalPnl >= 0 ? 'psc-up' : 'psc-down'}`;
+  }
+  if (cntEl) cntEl.textContent = myAssets.length;
 }
 // ── AI PORTFÖY YÖNETİCİSİ ──────────────────────────────────────
 function openAiPortfolioModal() { document.getElementById('aiPortfolioModal').classList.add('open'); }
