@@ -77,16 +77,20 @@ app.get('/api/news', async (req, res) => {
     console.log("COLLECT_API_KEY mevcut mu:", !!apiKey);
     console.log("COLLECT_API_KEY ilk 10 karakter:", apiKey ? apiKey.substring(0, 10) : 'YOK');
 
-    const tags = ['economy', 'exchange'];
+    const tags = ['economy', 'exchange', 'finance', 'general', 'invest'];
     let allNews = [];
     
     for (let tag of tags) {
-      const response = await axios.get(`https://api.collectapi.com/news/getNews?country=tr&tag=${tag}`, {
-        headers: { "authorization": apiKey }
-      });
-      console.log(`Tag [${tag}] sonuç:`, response.data?.success, '| Haber sayısı:', response.data?.result?.length);
-      if (response.data && response.data.success) {
-        allNews = allNews.concat(response.data.result);
+      try {
+        const response = await axios.get(`https://api.collectapi.com/news/getNews?country=tr&tag=${tag}`, {
+          headers: { "authorization": apiKey }
+        });
+        console.log(`Tag [${tag}] sonuç:`, response.data?.success, '| Haber sayısı:', response.data?.result?.length);
+        if (response.data && response.data.success) {
+          allNews = allNews.concat(response.data.result);
+        }
+      } catch (tagErr) {
+        console.warn(`Tag [${tag}] başarısız:`, tagErr.message);
       }
       // Rate limit aşmamak için taglar arasında 1.2 saniye bekle
       await new Promise(resolve => setTimeout(resolve, 1200));

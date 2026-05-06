@@ -140,7 +140,10 @@
  
         <!-- Haber Grid -->
         <div class="card">
-          <h3 class="section-title">Günün Ekonomi Gelişmeleri</h3>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 class="section-title" style="margin:0;">Günün Ekonomi Gelişmeleri</h3>
+            <button class="btn" style="font-size:12px; padding:6px 12px;" onclick="fetchNews(true)">🔄 Yenile</button>
+          </div>
           <div id="full-news-feed" class="news-feed-grid">
             <!-- Skeleton -->
             <div class="skeleton sk-card"></div>
@@ -189,6 +192,7 @@
             <div class="chart-btns">
               <button class="back-btn" onclick="showView('home-news-view')">← Geri</button>
               <button class="watchlist-btn" id="watchlist-btn" onclick="toggleWatchlist()">☆ İzlemeye Ekle</button>
+              <button class="add-to-portfolio-btn" id="add-to-portfolio-btn" onclick="openModalWithCurrentSym()">＋ Portföye Ekle</button>
               <button class="ai-btn" onclick="openAiModal()">🤖 AI Analiz</button>
             </div>
           </div>
@@ -221,23 +225,23 @@
       </div>
 
       <!-- ── GÖRÜNÜM 4: Portföy ─────────────────────────────── -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 class="section-title" style="margin: 0;">Portföy Özeti</h3>
-            <div style="display: flex; gap: 10px;">
-              <button class="ai-btn" onclick="openAiPortfolioModal()">🤖 AI Yönetimi</button>
-              <button class="btn btn-primary" onclick="openModal()">+ Varlık Ekle</button>
-            </div>
+      <div id="portfolio-view" class="view-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 class="section-title" style="margin: 0;">Portföy Özeti</h3>
+          <div style="display: flex; gap: 10px;">
+            <button class="ai-btn" onclick="openAiPortfolioModal()">🤖 AI Yönetimi</button>
+            <button class="btn btn-primary" onclick="openModalAndRefreshPortfolio()">+ Varlık Ekle</button>
           </div>
-          
-          <div class="balance-card" style="max-width: 350px; margin-bottom: 24px;">
-            <div class="bl-label">Toplam Portföy Değeri</div>
-            <div class="bl-value" id="portfolio-total-big">₺0,00</div>
-            <div class="bl-sub">Güncel piyasa fiyatlarıyla</div>
-          </div>
-          
-          <div class="markets-grid" id="portfolio-grid">
-            <!-- JavaScript ile doldurulacak -->
-          </div>
+        </div>
+
+        <div class="balance-card" style="max-width: 350px; margin-bottom: 24px;">
+          <div class="bl-label">Toplam Portföy Değeri</div>
+          <div class="bl-value" id="portfolio-total-big">₺0,00</div>
+          <div class="bl-sub">Güncel piyasa fiyatlarıyla</div>
+        </div>
+
+        <div class="markets-grid" id="portfolio-grid">
+          <!-- JavaScript ile doldurulacak -->
         </div>
       </div>
  

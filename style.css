@@ -487,6 +487,17 @@ body.analysis-mode .side-panel { display: flex; }
   border-color: var(--gold); color: var(--gold); background: rgba(192,125,0,0.07);
 }
 
+.add-to-portfolio-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  color: var(--accent); font-size: 12px; font-weight: 600;
+  transition: all 0.14s;
+}
+.add-to-portfolio-btn:hover {
+  background: var(--accent); color: white;
+}
+
 .timeframe-bar {
   display: flex; gap: 3px;
   padding: 3px; background: var(--bg-app);

@@ -143,15 +143,14 @@ function showView(viewId) {
 // ── NEWS ──────────────────────────────────────────────────────
 let newsCache = null;
 
-async function fetchNews() {
-  if (newsCache) { renderNews(newsCache); return; }
+async function fetchNews(forceRefresh = false) {
+  if (newsCache && !forceRefresh) { renderNews(newsCache); return; }
+  if (forceRefresh) newsCache = null;
 
   const container = document.getElementById('full-news-feed');
-  if (container) container.innerHTML = skeletonNews(6);
+  if (container) container.innerHTML = skeletonNews(12);
 
   try {
-    // CollectAPI yerine kendi backendimizden çekiyoruz
-    // Eskisi: const r = await fetch('/api/news');
     const r = await fetch(`${API_BASE}/api/news`);
     const data = await r.json();
 
@@ -182,7 +181,7 @@ function renderNews(news) {
   // Swiper
   const sliderWrap = document.getElementById('news-slider-wrapper');
   if (sliderWrap) {
-    sliderWrap.innerHTML = news.slice(0, 6).map(n => `
+    sliderWrap.innerHTML = news.slice(0, 8).map(n => `
       <div class="swiper-slide" onclick="window.open('${n.url}','_blank')">
         <img src="${n.image || ''}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=70'" loading="lazy">
         <div class="slide-overlay">
@@ -785,7 +784,25 @@ function addNewAsset() {
   safeSave('fs_assets', myAssets);
   symEl.value = ''; amtEl.value = ''; priceEl.value = '';
   closeModal();
+
+  // Her iki view'u da yenile
   renderList();
+  if (currentView === 'portfolio-view') {
+    renderPortfolioView();
+  }
+}
+
+// Grafik üzerinden direkt portföye ekle — sembolü otomatik doldurur
+function openModalWithCurrentSym() {
+  const symEl = document.getElementById('modal-symbol');
+  if (symEl && currentSym) symEl.value = currentSym;
+  openModal();
+}
+
+// Portföy sayfasındaki "Varlık Ekle" butonu — modal kapanınca portföyü yeniler
+function openModalAndRefreshPortfolio() {
+  openModal();
+  // Modal kapandıktan sonra portföyü yenile (addNewAsset içinde de tetikleniyor ama buton farklı yoldan kapansa diye)
 }
 
 // ── YENİ: TAM EKRAN PORTFÖY YÖNETİMİ ──────────────────────────
