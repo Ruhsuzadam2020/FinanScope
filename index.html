@@ -428,6 +428,20 @@
     }
   }
 
+  // Arkaplanda sessizce buluta kaydetme (her değişiklikte otomatik tetiklenir)
+  window.syncToCloudSilent = async function() {
+    if (!window.fbDb || !window.fbAuth?.currentUser) return;
+    try {
+      const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+      const uid = window.fbAuth.currentUser.uid;
+      await setDoc(doc(window.fbDb, 'users', uid), {
+        assets: window.myAssets || JSON.parse(localStorage.getItem('fs_assets') || '[]'),
+        watchlist: window.watchlist || JSON.parse(localStorage.getItem('fs_watchlist') || '[]'),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) { console.warn('Gizli senkronizasyon hatası:', e); }
+  };
+
   async function syncFromCloud(uid) {
     if (!window.fbDb) return;
     try {
@@ -447,15 +461,24 @@
       console.warn('Cloud sync error:', e.message);
     }
   }
-
-  async function handleSignOut() {
+async function handleSignOut() {
     if (!window.fbAuth) return;
     try {
       const { signOut } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
       await signOut(window.fbAuth);
       document.getElementById('user-profile').innerHTML = `<button class="login-trigger" onclick="openAuthModal()">Giriş Yap</button>`;
       closeProfileModal();
-      toast('Çıkış yapıldı', 'info');
+      
+      // YENİ: Çıkış yapıldığında cihazdaki verileri SİL ve ekranı sıfırla
+      localStorage.removeItem('fs_assets');
+      localStorage.removeItem('fs_watchlist');
+      window.myAssets = [];
+      window.watchlist = [];
+      
+      if (typeof renderList === 'function') renderList();
+      if (typeof renderPortfolioView === 'function' && currentView === 'portfolio-view') renderPortfolioView();
+      
+      toast('Çıkış yapıldı. Verileriniz gizlendi.', 'info');
     } catch(e) { toast('Çıkış hatası: ' + e.message, 'error'); }
   }
 

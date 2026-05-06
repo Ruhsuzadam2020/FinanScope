@@ -23,7 +23,15 @@ function safeLoad(key, fallback) {
   catch { return fallback; }
 }
 function safeSave(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  try { 
+    // Önce cihazın tarayıcısına kaydet
+    localStorage.setItem(key, JSON.stringify(val)); 
+    
+    // YENİ: Eğer kullanıcı giriş yapmışsa, beklemeden arka planda Firebase'i de güncelle!
+    if (typeof window.syncToCloudSilent === 'function') {
+      window.syncToCloudSilent();
+    }
+  } catch {}
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
