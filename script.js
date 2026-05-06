@@ -451,10 +451,27 @@ function selectSymbol(sym) {
 async function updateChart(symbol) {
   let sym = symbol.trim().toUpperCase();
   const cryptoList = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'AVAX', 'DOGE', 'TRX', 'DOT'];
+
   if (cryptoList.includes(sym)) {
+    // Bilinen kripto — direkt -USD ekle
     sym += '-USD';
-  } else if (!sym.includes('.') && !sym.includes('=') && !sym.includes('-') && !sym.match(/[A-Z]{3}-[A-Z]{3}/)) {
-    sym += '.IS';
+  } else if (sym.startsWith('^') || sym.includes('.') || sym.includes('=') || sym.includes('-')) {
+    // Zaten tam sembol (^GSPC, THYAO.IS, USDTRY=X, BTC-USD) — dokunma
+  } else {
+    // Belirsiz sembol — Yahoo'ya sor, doğru sembolü o söylesin
+    try {
+      const searchData = await proxyFetch(
+        \`https://query1.finance.yahoo.com/v1/finance/search?q=\${encodeURIComponent(sym)}&quotesCount=1\`
+      );
+      const hit = searchData?.quotes?.[0];
+      if (hit?.symbol) {
+        sym = hit.symbol; // Yahoo'nun döndürdyüğü doğru sembolü kullan
+      } else {
+        sym += '.IS'; // Hiç bulunamazsa son çare olarak BIST say
+      }
+    } catch {
+      sym += '.IS';
+    }
   }
   currentSym = sym;
   showView('analysis-view');
