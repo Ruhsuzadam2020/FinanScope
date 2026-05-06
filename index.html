@@ -39,13 +39,18 @@
     }
     initFirebase();
     // Farklı tarayıcıda sayfa yenilendiğinde oturumun devam edip etmediğini kontrol et
-    const { onAuthStateChanged } = await import("[https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js)");
-    onAuthStateChanged(window.fbAuth, async (user) => {
-      if (user) {
-        setUserProfile(user);
-        await syncFromCloud(user.uid);
-      }
-    });
+    // fbAuth hazır olana kadar bekle, sonra dinlemeye başla
+    const waitForAuth = setInterval(async () => {
+      if (!window.fbAuth) return;
+      clearInterval(waitForAuth);
+      const { onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      onAuthStateChanged(window.fbAuth, async (user) => {
+        if (user) {
+          setUserProfile(user);
+          await syncFromCloud(user.uid);
+        }
+      });
+    }, 200);
   </script>
 </head>
  
@@ -597,7 +602,7 @@ async function handleSignOut() {
     const prompt = `Sen uzman bir finansal analistsin. Kullanıcı şu an "${name}" (${sym}) varlığını inceliyor. Güncel Fiyat: ${price}, Değişim: ${change}. Kullanıcı sorusu: "${userMsg}". Lütfen bu varlığın türünü (hisse, kripto, emtia, borsa endeksi vb.) dikkate alarak profesyonel, net ve veriye dayalı bir analiz yap.`;
 
     try {
-      const res = await fetch('https://finanscope.onrender.com/api/ai-analyze', {
+      const res = await fetch(`${window.location.origin}/api/ai-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt })

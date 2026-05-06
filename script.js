@@ -120,7 +120,7 @@ async function fetchNews() {
   try {
     // CollectAPI yerine kendi backendimizden çekiyoruz
     // Eskisi: const r = await fetch('/api/news');
-const r = await fetch('https://finanscope.onrender.com/api/news');
+    const r = await fetch(`${window.location.origin}/api/news`);
     const data = await r.json();
 
     if (!data?.success || !data.result?.length) throw new Error("Veri yok");
@@ -819,7 +819,7 @@ async function generateAiPortfolio() {
   btn.disabled = true;
 
   try {
-    const res = await fetch('[https://finanscope.onrender.com/api/ai-portfolio](https://finanscope.onrender.com/api/ai-portfolio)', {
+    const res = await fetch(`${window.location.origin}/api/ai-portfolio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ budget, risk, category, duration })
