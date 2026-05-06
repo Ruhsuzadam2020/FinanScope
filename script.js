@@ -1042,11 +1042,83 @@ async function generateAiPortfolio() {
   }
 }
 
-// ── INIT ──────────────────────────────────────────────────────
+// ── MOBİL ALT NAVİGASYON SYNC ────────────────────────────────
+function setMobileNav(el) {
+  document.querySelectorAll('.mbn-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+// showView'u wrap ederek mobil nav'ı da senkronize et
+const _origShowView = showView;
+// showView zaten tanımlı — sadece sonuna mobil nav sync ekleyelim
+// (DOMContentLoaded'da çağrılacak)
+
+// ── MOBİL ARAMA ──────────────────────────────────────────────
+function openMobileSearch() {
+  const overlay = document.getElementById('mobile-search-overlay');
+  if (overlay) {
+    overlay.classList.add('open');
+    setTimeout(() => document.getElementById('mobile-search-input')?.focus(), 100);
+  }
+}
+function closeMobileSearch() {
+  document.getElementById('mobile-search-overlay')?.classList.remove('open');
+  const inp = document.getElementById('mobile-search-input');
+  if (inp) inp.value = '';
+  const res = document.getElementById('mobile-search-results');
+  if (res) res.innerHTML = '';
+}
+
+// Mobil arama input dinleyicisi
 document.addEventListener('DOMContentLoaded', () => {
+  const mobileInp = document.getElementById('mobile-search-input');
+  const mobileRes = document.getElementById('mobile-search-results');
+  let mobileTimer;
+
+  if (mobileInp) {
+    mobileInp.addEventListener('input', e => {
+      clearTimeout(mobileTimer);
+      const q = e.target.value.trim();
+      if (q.length < 2) { if (mobileRes) mobileRes.innerHTML = ''; return; }
+      mobileTimer = setTimeout(async () => {
+        const data = await proxyFetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8`);
+        if (!mobileRes) return;
+        if (!data?.quotes?.length) {
+          mobileRes.innerHTML = `<div style="padding:14px;color:var(--text-muted);font-size:13px;">Sonuç bulunamadı</div>`;
+          return;
+        }
+        mobileRes.innerHTML = data.quotes.map(q => {
+          const flag = q.exchange === 'IST' ? '🇹🇷' : q.exchange === 'CCC' ? '₿' : '🌐';
+          return `<div class="search-result-item" onclick="closeMobileSearch(); selectSymbol('${q.symbol}')">
+            <div class="sri-left">
+              <span class="sri-symbol">${flag} ${q.symbol}</span>
+              <span class="sri-name">${q.shortname || q.longname || ''}</span>
+            </div>
+            <span class="sri-badge">${q.exchange || ''}</span>
+          </div>`;
+        }).join('');
+      }, 280);
+    });
+  }
+
+  // Escape ile kapat
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeMobileSearch();
+  });
+
+  // showView çağrılınca alt nav'ı güncelle
+  const origShowView = window.showView;
+  if (origShowView) {
+    window.showView = function(viewId) {
+      origShowView(viewId);
+      const mbnItem = document.querySelector(`.mbn-item[data-view="${viewId}"]`);
+      setMobileNav(mbnItem);
+    };
+  }
+});
   setupTheme();
   initDiscovery();
   showView('home-news-view');
   // Preload sidebar if analysis mode later
   renderList();
-}) };
+});

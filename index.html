@@ -82,6 +82,8 @@
     </div>
  
     <div class="header-right">
+      <!-- Mobil arama butonu (sadece mobilde görünür) -->
+      <button class="mobile-search-btn" onclick="openMobileSearch()" title="Ara">🔍</button>
       <div id="user-profile">
         <button class="login-trigger" onclick="openAuthModal()">Giriş Yap</button>
       </div>
@@ -688,5 +690,34 @@ async function handleSignOut() {
   });
 </script>
  
+<!-- ══ MOBİL ALT NAVİGASYON ════════════════════════════════════ -->
+<nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <div class="mbn-item active" data-view="home-news-view" onclick="showView('home-news-view'); setMobileNav(this)">
+    <span class="mbn-icon">📰</span>
+    <span class="mbn-label">Haberler</span>
+  </div>
+  <div class="mbn-item" data-view="markets-view" onclick="showView('markets-view'); setMobileNav(this)">
+    <span class="mbn-icon">📊</span>
+    <span class="mbn-label">Piyasalar</span>
+  </div>
+  <div class="mbn-item" data-view="analysis-view" onclick="showView('analysis-view'); setMobileNav(this)">
+    <span class="mbn-icon">📈</span>
+    <span class="mbn-label">Grafikler</span>
+  </div>
+  <div class="mbn-item" data-view="portfolio-view" onclick="showView('portfolio-view'); setMobileNav(this)">
+    <span class="mbn-icon">💼</span>
+    <span class="mbn-label">Portföy</span>
+  </div>
+</nav>
+
+<!-- ══ MOBİL ARAMA OVERLAY ══════════════════════════════════════ -->
+<div class="mobile-search-overlay" id="mobile-search-overlay">
+  <div class="mobile-search-top">
+    <input type="text" id="mobile-search-input" placeholder="Hisse, kripto veya emtia ara..." autocomplete="off">
+    <button class="mobile-search-close" onclick="closeMobileSearch()">İptal</button>
+  </div>
+  <div class="mobile-search-results" id="mobile-search-results"></div>
+</div>
+
 </body>
 </html>
