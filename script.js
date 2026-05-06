@@ -48,8 +48,8 @@ function toast(msg, type = 'info') {
 
 async function proxyFetch(targetUrl) {
   try {
-    // DİKKAT: Buraya KENDİ Render linkini yazmalısın!
-    const renderUrl = 'https://finanscope.onrender.com';
+    // Eski: const renderUrl = 'https://finanscope.onrender.com';
+const renderUrl = window.location.origin; // Dinamik hale getirdik
     
     const r = await fetch(`${renderUrl}/api/proxy/yahoo?url=${encodeURIComponent(targetUrl)}`);
     if (!r.ok) throw new Error('Sunucu proxy hatası');
