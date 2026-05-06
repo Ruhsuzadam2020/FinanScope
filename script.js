@@ -11,7 +11,7 @@ const PROXY_MAX_RETRIES = 2;
 
 // ── STATE ─────────────────────────────────────────────────────
 let myAssets    = safeLoad('fs_assets', []);
-let watchlist   = safeLoad('fs_watchlist', ['XU100.IS', 'BTC-USD', 'USDTRY=X', 'GAU=X']);
+let watchlist   = safeLoad('fs_watchlist', ['XU100.IS', 'BTC-USD', 'USDTRY=X', 'GC=F']);
 let myChart     = null;
 let currentSym  = 'XU100.IS';
 let currentRange    = '1d';
@@ -229,7 +229,7 @@ async function fetchGlobalMarkets() {
       { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',  icon:'₿', label:'Kripto Paralar' },
       { key:'cripto',sym:'ETH-USD',  name:'Ethereum', icon:'₿', label:'Kripto Paralar' },
       { key:'cripto',sym:'SOL-USD',  name:'Solana',   icon:'₿', label:'Kripto Paralar' },
-      { key:'emtia', sym:'GAU=X',    name:'Altın TRY', icon:'🏅', label:'Altın & Emtia' },
+      { key:'emtia', sym:'GC=F',    name:'Altın TRY', icon:'🏅', label:'Altın & Emtia' },
       { key:'emtia', sym:'GC=F',     name:'Altın USD', icon:'🏅', label:'Altın & Emtia' },
       { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',  icon:'🏅', label:'Altın & Emtia' },
     ];
@@ -520,7 +520,12 @@ function formatPrice(val, sym = '') {
   if (val === null || val === undefined) return '-';
   const isTL = sym.endsWith('.IS') || sym.includes('TRY');
   const prefix = isTL ? '₺' : (sym.includes('USD') || sym.includes('-USD') ? '$' : '');
-  return prefix + val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: sym.includes('BTC') ? 0 : 2 });
+  // BTC gibi büyük sayılarda ondalık gösterme, küçük değerlerde (döviz) 4 hane göster
+  let maxFrac = 2;
+  if (val >= 10000) maxFrac = 0;        // BTC, büyük fiyatlar
+  else if (val < 1) maxFrac = 4;        // Küçük kripto, kuruş altı
+  else if (val < 10) maxFrac = 3;       // Düşük fiyatlı varlıklar
+  return prefix + val.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
 }
 
 function setTimeframe(range, interval, e) {
@@ -656,7 +661,7 @@ function initDiscovery() {
     { sym: 'XU100.IS', label: 'BIST 100' },
     { sym: 'USDTRY=X',  label: 'USD/TRY' },
     { sym: 'EURTRY=X',  label: 'EUR/TRY' },
-    { sym: 'GAU=X',     label: 'Altın' },
+    { sym: 'GC=F',     label: 'Altın' },
     { sym: 'BTC-USD',   label: 'Bitcoin' },
     { sym: 'ETH-USD',   label: 'Ethereum' },
     { sym: 'THYAO.IS',  label: 'THYAO' },
