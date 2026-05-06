@@ -88,6 +88,8 @@ app.get('/api/news', async (req, res) => {
       if (response.data && response.data.success) {
         allNews = allNews.concat(response.data.result);
       }
+      // Rate limit aşmamak için taglar arasında 1.2 saniye bekle
+      await new Promise(resolve => setTimeout(resolve, 1200));
     }
     
     const uniqueNews = Array.from(new Map(allNews.map(item => [item.url, item])).values());
