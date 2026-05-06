@@ -1049,4 +1049,4 @@ document.addEventListener('DOMContentLoaded', () => {
   showView('home-news-view');
   // Preload sidebar if analysis mode later
   renderList();
-});
+}) };
