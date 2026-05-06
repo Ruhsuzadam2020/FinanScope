@@ -370,16 +370,22 @@ body.analysis-mode .side-panel { display: flex; }
 .psc-down { color: #ff7755; }
 
 /* ── SWIPER FIX — full-cover image ───────────────────────── */
-.swiper { width: 100%; height: 360px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); }
-.swiper-slide { position: relative; cursor: pointer; overflow: hidden; width: 100%; height: 100%; }
+.swiper { width: 100%; height: 380px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); }
+.swiper-wrapper { height: 100%; }
+.swiper-slide {
+  position: relative; cursor: pointer; overflow: hidden;
+  width: 100% !important; height: 100% !important;
+  background: #0d1320;
+}
 .swiper-slide img {
+  position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center top;
   display: block;
-  transition: transform 0.4s;
+  transition: transform 0.5s ease;
 }
-.swiper-slide:hover img { transform: scale(1.04); }
+.swiper-slide:hover img { transform: scale(1.05); }
 
 
 .slide-overlay {

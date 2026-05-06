@@ -181,23 +181,36 @@ function renderNews(news) {
   // Swiper
   const sliderWrap = document.getElementById('news-slider-wrapper');
   if (sliderWrap) {
-    sliderWrap.innerHTML = news.slice(0, 8).map(n => `
+    // Yeterli slide için haberleri tekrarla (loop için min 6 gerekli)
+    const slideNews = news.length >= 6 ? news.slice(0, 10) : [...news, ...news, ...news].slice(0, 12);
+    
+    sliderWrap.innerHTML = slideNews.map(n => {
+      // Büyük, kaliteli görsel URL'i oluştur
+      const img = n.image
+        ? n.image.replace(/w=\d+/, 'w=1200').replace(/q=\d+/, 'q=85')
+        : 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=85';
+      return `
       <div class="swiper-slide" onclick="window.open('${n.url}','_blank')">
-        <img src="${n.image || ''}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=70'" loading="lazy">
+        <img src="${img}"
+             onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=85'"
+             alt="${n.name}"
+             style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;">
         <div class="slide-overlay">
-          <div class="slide-tag">Ekonomi</div>
+          <div class="slide-tag">${n.source || 'Ekonomi'}</div>
           <div class="slide-title">${n.name}</div>
-          <div class="slide-src">${n.source}</div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
 
-    // Init / re-init swiper
+    // Swiper'ı yeniden başlat
     if (window._swiperInstance) { window._swiperInstance.destroy(true, true); }
     window._swiperInstance = new Swiper('.mySwiper', {
-      loop: true, autoplay: { delay: 4500, disableOnInteraction: false },
+      loop: slideNews.length >= 4,
+      autoplay: { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true },
       pagination: { el: '.swiper-pagination', clickable: true },
-      effect: 'slide', grabCursor: true,
+      grabCursor: true,
+      speed: 600,
+      watchSlidesProgress: true,
     });
   }
 
@@ -302,8 +315,44 @@ async function fetchGlobalMarkets() {
   }
 
   marketsCache = { endpoints, results };
+  
+  // CollectAPI sonuçlarına ek olarak HER ZAMAN global borsaları Yahoo'dan çek
+  await fetchGlobalExchanges(results);
+  
   renderMarkets(marketsCache);
 }
+
+// Global borsaları Yahoo Finance'den çek (CollectAPI'den bağımsız)
+async function fetchGlobalExchanges(results) {
+  const globalSymbols = [
+    // 🇺🇸 ABD
+    { key:'us', sym:'^GSPC',  name:'S&P 500',    icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'^DJI',   name:'Dow Jones',  icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'^IXIC',  name:'NASDAQ',     icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'AAPL',   name:'Apple',      icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'NVDA',   name:'Nvidia',     icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'TSLA',   name:'Tesla',      icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'MSFT',   name:'Microsoft',  icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'GOOGL',  name:'Google',     icon:'🇺🇸', label:'ABD Piyasaları' },
+    // 🌍 Avrupa & Asya
+    { key:'global', sym:'^FTSE',  name:'FTSE 100',   icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^GDAXI', name:'DAX',         icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^FCHI',  name:'CAC 40',      icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^N225',  name:'Nikkei 225',  icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^HSI',   name:'Hang Seng',   icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^BSESN', name:'Sensex',      icon:'🌍', label:'Global Endeksler' },
+  ];
+
+  await Promise.all(globalSymbols.map(async fb => {
+    try {
+      const d = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${fb.sym}?range=1d&interval=1d`);
+      const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      const prev  = d?.chart?.result?.[0]?.meta?.previousClose || price;
+      const rate  = prev && price ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
+      if (!results[fb.key]) results[fb.key] = { key: fb.key, label: fb.label, icon: fb.icon, items: [] };
+      if (price) results[fb.key].items.push({ text: fb.name, lastprice: price.toLocaleString('en-US', {maximumFractionDigits:2}), rate, _sym: fb.sym });
+    } catch(e) { /* sessizce atla */ }
+  }));
 
 const CRYPTO_MAP = { 'Bitcoin':'BTC-USD','Ethereum':'ETH-USD','Solana':'SOL-USD','XRP':'XRP-USD','BNB':'BNB-USD','Cardano':'ADA-USD','Avalanche':'AVAX-USD','Tether':'USDT-USD' };
 
@@ -336,14 +385,11 @@ function renderMarkets({ endpoints, results }) {
     const rows = sec.items.map(item => {
       let displayName = item.text || item.name;
       
-      // DÜZELTME: Kripto verilerindeki item.code çakışmasını engelliyoruz
       let clickSym = item._sym;
       if (!clickSym) {
         if (sec.key === 'cripto') {
-          // Kripto ise sonuna -USD ekle (Örn: BTC-USD)
           clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
         } else if (sec.key === 'bist') {
-          // BIST ise hisse kodunu al (Örn: ASELS)
           clickSym = item.code || displayName;
         } else {
           clickSym = displayName;
@@ -351,19 +397,27 @@ function renderMarkets({ endpoints, results }) {
       }
       
       let rawPrice = item.lastprice || item.buying || item.price || '-';
-      
       let rateText = item.rate || item.change || item.changeDay || '0.00';
       let rate = parseFloat(rateText);
-      
       let cpClass = rate > 0 ? 'cp-up' : rate < 0 ? 'cp-down' : 'cp-flat';
       let sign = rate > 0 ? '+' : '';
+
+      // Para birimi: BIST ve emtia TL, US/Global/Kripto USD
+      const isUSD = sec.key === 'us' || sec.key === 'global' || sec.key === 'cripto';
+      const currency = isUSD ? '$' : '₺';
+      // Alt başlık
+      const subLabel = sec.key === 'bist' ? 'BIST'
+        : sec.key === 'cripto' ? 'Kripto'
+        : sec.key === 'us'     ? 'ABD'
+        : sec.key === 'global' ? 'Global'
+        : 'Emtia';
       
       return `<div class="asset-row" onclick="updateChart('${clickSym}')">
         <div>
           <div class="ar-name">${displayName}</div>
-          <div class="ar-sub">${sec.key === 'bist' ? 'BIST' : sec.key === 'cripto' ? 'Kripto' : 'Emtia'}</div>
+          <div class="ar-sub">${subLabel}</div>
         </div>
-        <div class="ar-price">₺${rawPrice}</div>
+        <div class="ar-price">${currency}${rawPrice}</div>
         <div class="change-pill ${cpClass}">${sign}%${rateText}</div>
       </div>`;
     }).join('');
