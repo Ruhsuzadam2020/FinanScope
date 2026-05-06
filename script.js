@@ -28,12 +28,10 @@ function safeLoad(key, fallback) {
   catch { return fallback; }
 }
 function safeSave(key, val) {
-  try { 
+  try {
     localStorage.setItem(key, JSON.stringify(val));
-    // Global referansları da güncelle (Firestore sync için)
     if (key === 'fs_assets')    window.myAssets  = val;
     if (key === 'fs_watchlist') window.watchlist = val;
-    // Giriş yapılmışsa Firebase'e de kaydet
     if (typeof window.syncToCloudSilent === 'function') {
       window.syncToCloudSilent();
     }
@@ -48,23 +46,27 @@ function toast(msg, type = 'info') {
   t.className = `toast toast-${type}`;
   t.textContent = msg;
   wrap.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(20px)'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 320); }, 3200);
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(20px)';
+    t.style.transition = '0.3s';
+    setTimeout(() => t.remove(), 320);
+  }, 3200);
 }
 
-
+// ── PROXY FETCH ───────────────────────────────────────────────
 async function proxyFetch(targetUrl) {
   try {
     const r = await fetch(`${API_BASE}/api/proxy/yahoo?url=${encodeURIComponent(targetUrl)}`);
     if (!r.ok) throw new Error('Sunucu proxy hatası');
-    
     return await r.json();
   } catch (e) {
     console.error('Veri çekme hatası:', e);
     return null;
   }
 }
+
 // ── KUR ÇEVİRİCİ ──────────────────────────────────────────────
-// USD/EUR bazlı varlıkları TRY'ye çevirir
 let _usdTryRate = null;
 async function getUsdTry() {
   if (_usdTryRate) return _usdTryRate;
@@ -76,22 +78,17 @@ async function getUsdTry() {
   } catch { return 0; }
 }
 
-// Fiyatı her zaman TRY'ye çevirir, sembol para birimini otomatik algılar
 async function getPriceInTRY(symbol, priceInNativeCurrency) {
   if (!priceInNativeCurrency) return 0;
-  // TRY cinsinden varlıklar (BIST hisseleri, TRY döviz çiftleri)
   if (symbol.endsWith('.IS') || symbol.includes('TRY') || symbol.includes('=F')) {
     return priceInNativeCurrency;
   }
-  // USD cinsinden varlıklar (BTC-USD, ETH-USD, GC=F hariç)
   if (symbol.endsWith('-USD') || symbol.endsWith('=X') || symbol === 'BTC-USD' || symbol === 'ETH-USD') {
     const usdtry = await getUsdTry();
     return usdtry > 0 ? priceInNativeCurrency * usdtry : 0;
   }
   return priceInNativeCurrency;
 }
-
-
 
 // ── VIEW MANAGER ──────────────────────────────────────────────
 function showView(viewId) {
@@ -110,7 +107,6 @@ function showView(viewId) {
   currentView = viewId;
   target.classList.add('active');
 
-  // Update active nav item
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.view === viewId);
   });
@@ -130,10 +126,10 @@ function showView(viewId) {
       document.body.classList.add('markets-mode');
       fetchGlobalMarkets();
     } else if (viewId === 'portfolio-view') {
-      document.body.classList.add('markets-mode'); // Geniş ekran modu
-      if (sidebar) sidebar.style.display = 'none'; // Yan paneli gizle
+      document.body.classList.add('markets-mode');
+      if (sidebar) sidebar.style.display = 'none';
       if (mainLayout) mainLayout.style.gridTemplateColumns = '1fr';
-      renderPortfolioView(); // Yeni tam ekran portföyü yükle
+      renderPortfolioView();
     }
   }
 
@@ -153,7 +149,6 @@ async function fetchNews(forceRefresh = false) {
   try {
     const r = await fetch(`${API_BASE}/api/news`);
     const data = await r.json();
-
     if (!data?.success || !data.result?.length) throw new Error("Veri yok");
     newsCache = data.result;
     renderNews(newsCache);
@@ -167,7 +162,6 @@ function skeletonNews(n) {
 }
 
 function renderNews(news) {
-  // Ticker
   const ticker = document.getElementById('ticker-inner');
   if (ticker) {
     const items = news.slice(0, 12).map(n =>
@@ -175,17 +169,13 @@ function renderNews(news) {
         <span class="ticker-sym">📰</span> ${n.name}
       </span>`
     ).join('');
-    ticker.innerHTML = items + items; // duplicate for infinite scroll
+    ticker.innerHTML = items + items;
   }
 
-  // Swiper
   const sliderWrap = document.getElementById('news-slider-wrapper');
   if (sliderWrap) {
-    // Yeterli slide için haberleri tekrarla (loop için min 6 gerekli)
     const slideNews = news.length >= 6 ? news.slice(0, 10) : [...news, ...news, ...news].slice(0, 12);
-    
     sliderWrap.innerHTML = slideNews.map(n => {
-      // Büyük, kaliteli görsel URL'i oluştur
       const img = n.image
         ? n.image.replace(/w=\d+/, 'w=1200').replace(/q=\d+/, 'q=85')
         : 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=85';
@@ -202,7 +192,6 @@ function renderNews(news) {
       </div>`;
     }).join('');
 
-    // Swiper'ı yeniden başlat
     if (window._swiperInstance) { window._swiperInstance.destroy(true, true); }
     window._swiperInstance = new Swiper('.mySwiper', {
       loop: slideNews.length >= 4,
@@ -214,7 +203,6 @@ function renderNews(news) {
     });
   }
 
-  // News grid
   const container = document.getElementById('full-news-feed');
   if (!container) return;
 
@@ -238,6 +226,13 @@ function renderNews(news) {
 // ── MARKETS ───────────────────────────────────────────────────
 let marketsCache = null;
 
+// HATA DÜZELTMESİ: CRYPTO_MAP burada, üst scope'ta tanımlı (renderMarkets'ın içinde değil)
+const CRYPTO_MAP = {
+  'Bitcoin':'BTC-USD','Ethereum':'ETH-USD','Solana':'SOL-USD',
+  'XRP':'XRP-USD','BNB':'BNB-USD','Cardano':'ADA-USD',
+  'Avalanche':'AVAX-USD','Tether':'USDT-USD'
+};
+
 async function fetchGlobalMarkets() {
   if (marketsCache) { renderMarkets(marketsCache); return; }
 
@@ -253,7 +248,6 @@ async function fetchGlobalMarkets() {
   const results = {};
   await Promise.all(endpoints.map(async ep => {
     try {
-      // CollectAPI yerine kendi backendimizden çekiyoruz
       const res = await fetch(`${API_BASE}/api/economy/${ep.url}`);
       const data = await res.json();
       if (data?.success && data.result?.length) {
@@ -262,40 +256,35 @@ async function fetchGlobalMarkets() {
     } catch(e) { console.warn('Piyasa verisi çekilemedi:', ep.key); }
   }));
 
-  // Fallback: if no data from CollectAPI, try Yahoo Finance for key symbols
+  // HATA DÜZELTMESİ: Fallback bloğunun kapanış parantezi eklendi
   if (!Object.keys(results).length) {
     toast('CollectAPI erişilemedi, yedek veri yükleniyor...', 'info');
     const fallbackSymbols = [
-      // 🇹🇷 Borsa İstanbul
-      { key:'bist',  sym:'XU100.IS', name:'BIST 100', icon:'🇹🇷', label:'Borsa İstanbul' },
-      { key:'bist',  sym:'THYAO.IS', name:'THYAO', icon:'🇹🇷', label:'Borsa İstanbul' },
-      { key:'bist',  sym:'GARAN.IS', name:'GARAN', icon:'🇹🇷', label:'Borsa İstanbul' },
-      { key:'bist',  sym:'ASELS.IS', name:'ASELS', icon:'🇹🇷', label:'Borsa İstanbul' },
-      { key:'bist',  sym:'SASA.IS',  name:'SASA',  icon:'🇹🇷', label:'Borsa İstanbul' },
-      // 🇺🇸 ABD Piyasaları
-      { key:'us',    sym:'^GSPC',    name:'S&P 500',   icon:'🇺🇸', label:'ABD Piyasaları' },
-      { key:'us',    sym:'^DJI',     name:'Dow Jones',  icon:'🇺🇸', label:'ABD Piyasaları' },
-      { key:'us',    sym:'^IXIC',    name:'NASDAQ',     icon:'🇺🇸', label:'ABD Piyasaları' },
-      { key:'us',    sym:'AAPL',     name:'Apple',      icon:'🇺🇸', label:'ABD Piyasaları' },
-      { key:'us',    sym:'NVDA',     name:'Nvidia',     icon:'🇺🇸', label:'ABD Piyasaları' },
-      { key:'us',    sym:'TSLA',     name:'Tesla',      icon:'🇺🇸', label:'ABD Piyasaları' },
-      // 🌍 Avrupa & Asya
-      { key:'global',sym:'^FTSE',    name:'FTSE 100',  icon:'🌍', label:'Global Endeksler' },
-      { key:'global',sym:'^GDAXI',   name:'DAX',       icon:'🌍', label:'Global Endeksler' },
-      { key:'global',sym:'^N225',    name:'Nikkei 225',icon:'🌍', label:'Global Endeksler' },
-      { key:'global',sym:'^HSI',     name:'Hang Seng', icon:'🌍', label:'Global Endeksler' },
-      // ₿ Kripto
-      { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',   icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'ETH-USD',  name:'Ethereum',  icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'SOL-USD',  name:'Solana',    icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'BNB-USD',  name:'BNB',       icon:'₿', label:'Kripto Paralar' },
-      { key:'cripto',sym:'XRP-USD',  name:'XRP',       icon:'₿', label:'Kripto Paralar' },
-      // 🏅 Emtia & Döviz
-      { key:'emtia', sym:'GC=F',     name:'Altın (ONS)',  icon:'🏅', label:'Emtia & Döviz' },
-      { key:'emtia', sym:'SI=F',     name:'Gümüş',        icon:'🏅', label:'Emtia & Döviz' },
-      { key:'emtia', sym:'CL=F',     name:'Ham Petrol',   icon:'🏅', label:'Emtia & Döviz' },
-      { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',      icon:'🏅', label:'Emtia & Döviz' },
-      { key:'emtia', sym:'EURUSD=X', name:'EUR/USD',      icon:'🏅', label:'Emtia & Döviz' },
+      { key:'bist',  sym:'XU100.IS', name:'BIST 100',    icon:'🇹🇷', label:'Borsa İstanbul' },
+      { key:'bist',  sym:'THYAO.IS', name:'THYAO',        icon:'🇹🇷', label:'Borsa İstanbul' },
+      { key:'bist',  sym:'GARAN.IS', name:'GARAN',        icon:'🇹🇷', label:'Borsa İstanbul' },
+      { key:'bist',  sym:'ASELS.IS', name:'ASELS',        icon:'🇹🇷', label:'Borsa İstanbul' },
+      { key:'bist',  sym:'SASA.IS',  name:'SASA',         icon:'🇹🇷', label:'Borsa İstanbul' },
+      { key:'us',    sym:'^GSPC',    name:'S&P 500',       icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'^DJI',     name:'Dow Jones',     icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'^IXIC',    name:'NASDAQ',        icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'AAPL',     name:'Apple',         icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'NVDA',     name:'Nvidia',        icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'us',    sym:'TSLA',     name:'Tesla',         icon:'🇺🇸', label:'ABD Piyasaları' },
+      { key:'global',sym:'^FTSE',    name:'FTSE 100',      icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^GDAXI',   name:'DAX',           icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^N225',    name:'Nikkei 225',    icon:'🌍', label:'Global Endeksler' },
+      { key:'global',sym:'^HSI',     name:'Hang Seng',     icon:'🌍', label:'Global Endeksler' },
+      { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',       icon:'₿',  label:'Kripto Paralar' },
+      { key:'cripto',sym:'ETH-USD',  name:'Ethereum',      icon:'₿',  label:'Kripto Paralar' },
+      { key:'cripto',sym:'SOL-USD',  name:'Solana',        icon:'₿',  label:'Kripto Paralar' },
+      { key:'cripto',sym:'BNB-USD',  name:'BNB',           icon:'₿',  label:'Kripto Paralar' },
+      { key:'cripto',sym:'XRP-USD',  name:'XRP',           icon:'₿',  label:'Kripto Paralar' },
+      { key:'emtia', sym:'GC=F',     name:'Altın (ONS)',   icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'SI=F',     name:'Gümüş',         icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'CL=F',     name:'Ham Petrol',    icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',       icon:'🏅', label:'Emtia & Döviz' },
+      { key:'emtia', sym:'EURUSD=X', name:'EUR/USD',       icon:'🏅', label:'Emtia & Döviz' },
     ];
     const buckets = {};
     await Promise.all(fallbackSymbols.map(async fb => {
@@ -307,7 +296,7 @@ async function fetchGlobalMarkets() {
       if (price) buckets[fb.key].items.push({ text: fb.name, lastprice: price.toFixed(2), rate, _sym: fb.sym });
     }));
     Object.assign(results, buckets);
-  }
+  } // <-- HATA DÜZELTMESİ: Fallback if bloğunun kapanışı
 
   if (!Object.keys(results).length) {
     if (container) container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="es-icon">📡</div><p class="es-text">Piyasa verisi alınamadı.<br>Lütfen sayfayı yenileyin.</p></div>`;
@@ -315,32 +304,27 @@ async function fetchGlobalMarkets() {
   }
 
   marketsCache = { endpoints, results };
-  
-  // CollectAPI sonuçlarına ek olarak HER ZAMAN global borsaları Yahoo'dan çek
   await fetchGlobalExchanges(results);
-  
   renderMarkets(marketsCache);
 }
 
-// Global borsaları Yahoo Finance'den çek (CollectAPI'den bağımsız)
+// HATA DÜZELTMESİ: fetchGlobalExchanges ayrı, düzgün kapatılmış fonksiyon
 async function fetchGlobalExchanges(results) {
   const globalSymbols = [
-    // 🇺🇸 ABD
-    { key:'us', sym:'^GSPC',  name:'S&P 500',    icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'^DJI',   name:'Dow Jones',  icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'^IXIC',  name:'NASDAQ',     icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'AAPL',   name:'Apple',      icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'NVDA',   name:'Nvidia',     icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'TSLA',   name:'Tesla',      icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'MSFT',   name:'Microsoft',  icon:'🇺🇸', label:'ABD Piyasaları' },
-    { key:'us', sym:'GOOGL',  name:'Google',     icon:'🇺🇸', label:'ABD Piyasaları' },
-    // 🌍 Avrupa & Asya
-    { key:'global', sym:'^FTSE',  name:'FTSE 100',   icon:'🌍', label:'Global Endeksler' },
-    { key:'global', sym:'^GDAXI', name:'DAX',         icon:'🌍', label:'Global Endeksler' },
-    { key:'global', sym:'^FCHI',  name:'CAC 40',      icon:'🌍', label:'Global Endeksler' },
-    { key:'global', sym:'^N225',  name:'Nikkei 225',  icon:'🌍', label:'Global Endeksler' },
-    { key:'global', sym:'^HSI',   name:'Hang Seng',   icon:'🌍', label:'Global Endeksler' },
-    { key:'global', sym:'^BSESN', name:'Sensex',      icon:'🌍', label:'Global Endeksler' },
+    { key:'us', sym:'^GSPC',   name:'S&P 500',    icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'^DJI',    name:'Dow Jones',   icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'^IXIC',   name:'NASDAQ',      icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'AAPL',    name:'Apple',       icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'NVDA',    name:'Nvidia',      icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'TSLA',    name:'Tesla',       icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'MSFT',    name:'Microsoft',   icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'us', sym:'GOOGL',   name:'Google',      icon:'🇺🇸', label:'ABD Piyasaları' },
+    { key:'global', sym:'^FTSE',  name:'FTSE 100',  icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^GDAXI', name:'DAX',       icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^FCHI',  name:'CAC 40',    icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^N225',  name:'Nikkei 225',icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^HSI',   name:'Hang Seng', icon:'🌍', label:'Global Endeksler' },
+    { key:'global', sym:'^BSESN', name:'Sensex',    icon:'🌍', label:'Global Endeksler' },
   ];
 
   await Promise.all(globalSymbols.map(async fb => {
@@ -353,20 +337,17 @@ async function fetchGlobalExchanges(results) {
       if (price) results[fb.key].items.push({ text: fb.name, lastprice: price.toLocaleString('en-US', {maximumFractionDigits:2}), rate, _sym: fb.sym });
     } catch(e) { /* sessizce atla */ }
   }));
+} // <-- HATA DÜZELTMESİ: fetchGlobalExchanges düzgün kapatıldı
 
-const CRYPTO_MAP = { 'Bitcoin':'BTC-USD','Ethereum':'ETH-USD','Solana':'SOL-USD','XRP':'XRP-USD','BNB':'BNB-USD','Cardano':'ADA-USD','Avalanche':'AVAX-USD','Tether':'USDT-USD' };
-
+// HATA DÜZELTMESİ: renderMarkets artık bağımsız fonksiyon (fetchGlobalExchanges içinde değil)
 function renderMarkets({ endpoints, results }) {
-  // Mini stats bar (Üstteki özet bar)
   const statsBar = document.getElementById('mini-stats-bar');
   if (statsBar && results.bist?.items?.length) {
     const items = results.bist.items.slice(0, 5);
     statsBar.innerHTML = items.map(item => {
-      // DÜZELTME: Kripto veya BIST fark etmeksizin tüm olası oran alanlarını kontrol et
       const rateVal = item.rate || item.change || item.changeDay || '0.00';
       const rate = parseFloat(rateVal);
       const cls = rate > 0 ? 't-up' : rate < 0 ? 't-down' : '';
-      
       return `<div class="mini-stat">
         <div class="ms-label">${item.text || item.name}</div>
         <div class="ms-val">₺${item.lastprice || item.buying || '-'}</div>
@@ -375,16 +356,13 @@ function renderMarkets({ endpoints, results }) {
     }).join('');
   }
 
-  // Market grid (Ana piyasa tablosu)
   const grid = document.getElementById('markets-grid');
   if (!grid) return;
 
   grid.innerHTML = Object.values(results).map(sec => {
     if (!sec?.items?.length) return '';
-    
     const rows = sec.items.map(item => {
       let displayName = item.text || item.name;
-      
       let clickSym = item._sym;
       if (!clickSym) {
         if (sec.key === 'cripto') {
@@ -395,23 +373,18 @@ function renderMarkets({ endpoints, results }) {
           clickSym = displayName;
         }
       }
-      
       let rawPrice = item.lastprice || item.buying || item.price || '-';
       let rateText = item.rate || item.change || item.changeDay || '0.00';
       let rate = parseFloat(rateText);
       let cpClass = rate > 0 ? 'cp-up' : rate < 0 ? 'cp-down' : 'cp-flat';
       let sign = rate > 0 ? '+' : '';
-
-      // Para birimi: BIST ve emtia TL, US/Global/Kripto USD
       const isUSD = sec.key === 'us' || sec.key === 'global' || sec.key === 'cripto';
       const currency = isUSD ? '$' : '₺';
-      // Alt başlık
       const subLabel = sec.key === 'bist' ? 'BIST'
         : sec.key === 'cripto' ? 'Kripto'
         : sec.key === 'us'     ? 'ABD'
         : sec.key === 'global' ? 'Global'
         : 'Emtia';
-      
       return `<div class="asset-row" onclick="updateChart('${clickSym}')">
         <div>
           <div class="ar-name">${displayName}</div>
@@ -421,13 +394,13 @@ function renderMarkets({ endpoints, results }) {
         <div class="change-pill ${cpClass}">${sign}%${rateText}</div>
       </div>`;
     }).join('');
-
     return `<div class="market-section-card">
       <div class="msc-header"><span>${sec.icon}</span> ${sec.label}</div>
       ${rows}
     </div>`;
   }).join('');
 }
+
 // ── SEARCH ────────────────────────────────────────────────────
 let searchTimer;
 const searchInput    = document.getElementById('global-search');
@@ -442,7 +415,6 @@ if (searchInput) {
   });
 }
 
-// Close dropdown on outside click
 document.addEventListener('click', e => {
   if (!e.target.closest('.search-section')) {
     if (searchDropdown) searchDropdown.style.display = 'none';
@@ -478,56 +450,44 @@ function selectSymbol(sym) {
 // ── CHART ─────────────────────────────────────────────────────
 async function updateChart(symbol) {
   let sym = symbol.trim().toUpperCase();
-  // DÜZELTME: En popüler kriptoları manuel yazdık ki "BTC" gelirse doğrudan BTC-USD yapsın
   const cryptoList = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'AVAX', 'DOGE', 'TRX', 'DOT'];
-  
   if (cryptoList.includes(sym)) {
     sym += '-USD';
-  } 
-  // Sadece gerçek hisseler için .IS ekle
-  else if (!sym.includes('.') && !sym.includes('=') && !sym.includes('-') && !sym.match(/[A-Z]{3}-[A-Z]{3}/)) {
+  } else if (!sym.includes('.') && !sym.includes('=') && !sym.includes('-') && !sym.match(/[A-Z]{3}-[A-Z]{3}/)) {
     sym += '.IS';
   }
   currentSym = sym;
   showView('analysis-view');
 
-  const loader = document.getElementById('chart-loader');
+  const loader  = document.getElementById('chart-loader');
   const priceEl = document.getElementById('active-price');
   const symEl   = document.getElementById('active-symbol');
   const chgEl   = document.getElementById('price-change');
   const nameEl  = document.getElementById('chart-fullname');
 
-  // 1. ADIM: Loader'ı başlat ve metni sıfırla
   if (loader) {
     loader.style.display = 'flex';
     const loaderText = loader.querySelector('.cl-text');
     if (loaderText) loaderText.textContent = "Grafik verisi alınıyor...";
   }
-  
   if (symEl) symEl.textContent = sym;
-
-  // Watchlist yıldızını güncelle
   updateWatchlistBtn(sym);
 
   try {
     const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${currentRange}&interval=${currentInterval}`);
 
-    // 2. ADIM: Veri alınamazsa loader'ı kapat ve hatayı göster
     if (!data?.chart?.result?.[0]) {
-      if (loader) { 
+      if (loader) {
         loader.querySelector('.cl-text').textContent = `"${sym}" verisi alınamadı`;
-        // Kullanıcı hatayı görebilsin diye 2 saniye sonra gizle
         setTimeout(() => { loader.style.display = 'none'; }, 2000);
       }
       toast(`${sym} için veri alınamadı`, 'error');
-      renderList(); // Sidebar skeleton'da kalmasın diye listeyi yenile
+      renderList();
       return;
     }
 
-    const res    = data.chart.result[0];
-    const meta   = res.meta;
-    
-    // Fiyat verilerini işle
+    const res  = data.chart.result[0];
+    const meta = res.meta;
     const prices = res.indicators.quote[0].close.map(p => p === null ? null : parseFloat(p));
     const times  = res.timestamp.map(t => {
       const d = new Date(t * 1000);
@@ -540,7 +500,6 @@ async function updateChart(symbol) {
     const change    = prevClose ? ((curPrice - prevClose) / prevClose * 100).toFixed(2) : 0;
     const isUp      = parseFloat(change) >= 0;
 
-    // Arayüz elemanlarını güncelle
     if (priceEl) priceEl.textContent = formatPrice(curPrice, sym);
     if (chgEl) {
       chgEl.textContent = `${isUp ? '+' : ''}${change}%`;
@@ -548,7 +507,6 @@ async function updateChart(symbol) {
     }
     if (nameEl) nameEl.textContent = meta.longName || meta.shortName || sym;
 
-    // Grafik renk ayarları
     const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridClr = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
     const textClr = isDark ? '#4a6278' : '#7a8fa6';
@@ -586,9 +544,7 @@ async function updateChart(symbol) {
             bodyColor: isDark ? '#e4eaf4' : '#0f1923',
             titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
             bodyFont:  { family: "'JetBrains Mono', monospace", size: 13, weight: '500' },
-            callbacks: {
-              label: ctx => formatPrice(ctx.raw, sym),
-            }
+            callbacks: { label: ctx => formatPrice(ctx.raw, sym) }
           }
         },
         scales: {
@@ -609,16 +565,14 @@ async function updateChart(symbol) {
       }
     });
 
-    // Başarılı yükleme sonunda loader'ı kapat
     if (loader) loader.style.display = 'none';
-
   } catch (error) {
     console.error("Grafik güncelleme hatası:", error);
     if (loader) loader.style.display = 'none';
     toast("Bir ağ hatası oluştu.", "error");
   }
 
-  renderList(); // Sidebar fiyatlarını tazele[cite: 2]
+  renderList();
 }
 
 function formatPrice(val, sym = '') {
@@ -627,13 +581,12 @@ function formatPrice(val, sym = '') {
   if (!isFinite(num)) return '-';
   const isTL = sym.endsWith('.IS') || sym.includes('TRY') || sym.includes('GC') || sym.includes('=F');
   const prefix = isTL ? '₺' : (sym.includes('-USD') || sym.includes('USD-') ? '$' : '');
-  // Fiyat büyüklüğüne göre ondalık hane belirle
   let maxFrac;
-  if (num >= 100000) maxFrac = 0;       // BTC TL, büyük değerler
-  else if (num >= 1000) maxFrac = 0;    // BTC USD, altın
-  else if (num >= 10) maxFrac = 2;      // Normal hisse
-  else if (num >= 1) maxFrac = 3;       // Düşük fiyatlı
-  else maxFrac = 4;                     // Kuruş altı kripto
+  if (num >= 100000) maxFrac = 0;
+  else if (num >= 1000) maxFrac = 0;
+  else if (num >= 10) maxFrac = 2;
+  else if (num >= 1) maxFrac = 3;
+  else maxFrac = 4;
   try {
     return prefix + num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
   } catch(e) {
@@ -677,9 +630,8 @@ async function renderList() {
   const container = document.getElementById('tab-content');
   if (!container) return;
 
-  // DÜZELTME: LocalStorage'daki bozuk veya boş (null) verileri temizle
   watchlist = watchlist.filter(s => s && typeof s === 'string' && s.trim() !== '');
-  myAssets = myAssets.filter(a => a && a.symbol);
+  myAssets  = myAssets.filter(a => a && a.symbol);
 
   const items = currentTab === 'portfolio'
     ? myAssets
@@ -694,17 +646,15 @@ async function renderList() {
   container.innerHTML = items.map(() => `<div class="skeleton sk-row"></div>`).join('');
   let total = 0;
 
-  // Promise.all içine try-catch ekliyoruz ki biri patlarsa hepsi patlamasın
   const cards = await Promise.all(items.map(async item => {
     try {
       const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
-      // --- BUNUNLA DEĞİŞTİR ---
-      const meta = data?.chart?.result?.[0]?.meta || {};
-      const price = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
-      const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
+      const meta   = data?.chart?.result?.[0]?.meta || {};
+      const price  = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
+      const prev   = data?.chart?.result?.[0]?.meta?.previousClose || price;
       const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
-      const isUp  = parseFloat(chgPct) >= 0;
-      // Para birimini TRY'ye çevir (BTC-USD gibi dolar bazlı varlıklar için)
+      const isUp   = parseFloat(chgPct) >= 0;
+
       let priceTRY = price;
       if (item.symbol.endsWith('-USD') || (item.symbol.endsWith('=X') && !item.symbol.includes('TRY'))) {
         const usdtry = await getUsdTry();
@@ -712,11 +662,10 @@ async function renderList() {
       }
       if (currentTab === 'portfolio') total += priceTRY * item.amount;
 
-      const shortSym = item.symbol.replace('.IS','').replace('-USD','').replace('=X','').slice(0, 6);
+      const shortSym  = item.symbol.replace('.IS','').replace('-USD','').replace('=X','').slice(0, 6);
       const detailTxt = currentTab === 'portfolio'
         ? `${item.amount} Adet · Maliyet: ${item.avgPrice > 0 ? '₺' + item.avgPrice : '-'}`
         : '★ İzleme';
-
       const delBtn = currentTab === 'portfolio'
         ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" title="Sil">×</button>`
         : `<button class="pi-del" onclick="removeFromWatchlist('${item.symbol}',event)" title="Çıkar">×</button>`;
@@ -736,12 +685,14 @@ async function renderList() {
           ${delBtn}
         </div>`;
     } catch (error) {
-      // Bir veri çekilemezse listeyi çökertme, sadece hata kartı bas
       return `
         <div class="pi-item" style="border-left: 3px solid var(--down);">
-          <div class="pi-info"><div class="pi-sym">${item.symbol}</div><div class="pi-det" style="color:var(--down)">Veri alınamadı</div></div>
-          ${currentTab === 'portfolio' 
-            ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" style="opacity:1">×</button>` 
+          <div class="pi-info">
+            <div class="pi-sym">${item.symbol}</div>
+            <div class="pi-det" style="color:var(--down)">Veri alınamadı</div>
+          </div>
+          ${currentTab === 'portfolio'
+            ? `<button class="pi-del" onclick="deleteAsset('${item.symbol}',event)" style="opacity:1">×</button>`
             : `<button class="pi-del" onclick="removeFromWatchlist('${item.symbol}',event)" style="opacity:1">×</button>`}
         </div>`;
     }
@@ -781,7 +732,7 @@ function initDiscovery() {
     { sym: 'XU100.IS', label: 'BIST 100' },
     { sym: 'USDTRY=X',  label: 'USD/TRY' },
     { sym: 'EURTRY=X',  label: 'EUR/TRY' },
-    { sym: 'GC=F',     label: 'Altın' },
+    { sym: 'GC=F',      label: 'Altın' },
     { sym: 'BTC-USD',   label: 'Bitcoin' },
     { sym: 'ETH-USD',   label: 'Ethereum' },
     { sym: 'THYAO.IS',  label: 'THYAO' },
@@ -810,7 +761,6 @@ function setupTheme() {
       const t = cb.checked ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('fs_theme', t);
-      // Redraw chart with new theme colors
       if (myChart) updateChart(currentSym);
     });
   }
@@ -822,14 +772,12 @@ function closeAuthModal() { document.getElementById('authModal').classList.remov
 function openModal()      { document.getElementById('assetModal').classList.add('open'); document.getElementById('modal-symbol').focus(); }
 function closeModal()     { document.getElementById('assetModal').classList.remove('open'); }
 
-// Close modal on backdrop click
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal')) {
     e.target.classList.remove('open');
   }
 });
 
-// Close on Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
@@ -838,17 +786,16 @@ document.addEventListener('keydown', e => {
 });
 
 function addNewAsset() {
-  const symEl    = document.getElementById('modal-symbol');
-  const amtEl    = document.getElementById('modal-amount');
-  const priceEl  = document.getElementById('modal-price');
+  const symEl   = document.getElementById('modal-symbol');
+  const amtEl   = document.getElementById('modal-amount');
+  const priceEl = document.getElementById('modal-price');
   const sym      = symEl.value.trim().toUpperCase();
   const amount   = parseFloat(amtEl.value);
   const avgPrice = parseFloat(priceEl.value) || 0;
 
-  if (!sym) { toast('Lütfen bir sembol girin', 'error'); symEl.focus(); return; }
+  if (!sym)              { toast('Lütfen bir sembol girin', 'error');  symEl.focus(); return; }
   if (!amount || amount <= 0) { toast('Geçerli bir miktar girin', 'error'); amtEl.focus(); return; }
 
-  // Check duplicate
   const existing = myAssets.findIndex(a => a.symbol === sym);
   if (existing >= 0) {
     myAssets[existing].amount += amount;
@@ -861,34 +808,27 @@ function addNewAsset() {
   safeSave('fs_assets', myAssets);
   symEl.value = ''; amtEl.value = ''; priceEl.value = '';
   closeModal();
-
-  // Her iki view'u da yenile
   renderList();
-  if (currentView === 'portfolio-view') {
-    renderPortfolioView();
-  }
+  if (currentView === 'portfolio-view') renderPortfolioView();
 }
 
-// Grafik üzerinden direkt portföye ekle — sembolü otomatik doldurur
 function openModalWithCurrentSym() {
   const symEl = document.getElementById('modal-symbol');
   if (symEl && currentSym) symEl.value = currentSym;
   openModal();
 }
 
-// Portföy sayfasındaki "Varlık Ekle" butonu — modal kapanınca portföyü yeniler
 function openModalAndRefreshPortfolio() {
   openModal();
-  // Modal kapandıktan sonra portföyü yenile (addNewAsset içinde de tetikleniyor ama buton farklı yoldan kapansa diye)
 }
 
-// ── YENİ: TAM EKRAN PORTFÖY YÖNETİMİ ──────────────────────────
+// ── PORTFÖY YÖNETİMİ ─────────────────────────────────────────
 async function renderPortfolioView() {
-  const grid = document.getElementById('portfolio-grid');
+  const grid    = document.getElementById('portfolio-grid');
   const totalEl = document.getElementById('portfolio-total-big');
   if (!grid) return;
 
-  myAssets = myAssets.filter(a => a && a.symbol); // Bozuk verileri temizle
+  myAssets = myAssets.filter(a => a && a.symbol);
 
   if (!myAssets.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding: 60px 0;"><div class="es-icon" style="font-size:40px;">💼</div><p class="es-text" style="font-size:14px; margin-top:10px;">Portföyünüzde henüz varlık bulunmuyor.<br>Yukarıdaki "Varlık Ekle" butonunu kullanabilirsiniz.</p></div>`;
@@ -898,22 +838,19 @@ async function renderPortfolioView() {
 
   grid.innerHTML = `<div class="loading-spinner-box" style="grid-column:1/-1"><div class="spin-icon"></div><span>Portföy hesaplanıyor...</span></div>`;
 
-  let total = 0;
-  let totalCost = 0;
-  let totalPnl = 0;
+  let total = 0, totalCost = 0, totalPnl = 0;
+
   const cards = await Promise.all(myAssets.map(async item => {
     try {
-      const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
-      // --- BUNUNLA DEĞİŞTİR ---
-      const meta = data?.chart?.result?.[0]?.meta || {};
-      const price = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
-      const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
-      const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
-      const isUp  = parseFloat(chgPct) >= 0;
+      const data    = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
+      const meta    = data?.chart?.result?.[0]?.meta || {};
+      const price   = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
+      const prev    = data?.chart?.result?.[0]?.meta?.previousClose || price;
+      const chgPct  = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
+      const isUp    = parseFloat(chgPct) >= 0;
       const cpClass = isUp ? 'cp-up' : 'cp-down';
-      const sign = isUp ? '+' : '';
+      const sign    = isUp ? '+' : '';
 
-      // Para birimini TRY'ye çevir
       let priceTRY = price;
       const isUsdBased = item.symbol.endsWith('-USD') || (item.symbol.endsWith('=X') && !item.symbol.includes('TRY'));
       if (isUsdBased) {
@@ -923,13 +860,9 @@ async function renderPortfolioView() {
 
       const currentTotal = priceTRY * item.amount;
       total += currentTotal;
-      // Maliyet de TRY bazında karşılaştır
       const avgPriceTRY = item.avgPrice > 0 ? item.avgPrice : 0;
-      const karZarar = avgPriceTRY > 0 ? (priceTRY - avgPriceTRY) * item.amount : 0;
-      if (avgPriceTRY > 0) {
-        totalCost += avgPriceTRY * item.amount;
-        totalPnl  += karZarar;
-      }
+      const karZarar    = avgPriceTRY > 0 ? (priceTRY - avgPriceTRY) * item.amount : 0;
+      if (avgPriceTRY > 0) { totalCost += avgPriceTRY * item.amount; totalPnl += karZarar; }
       const kzClass = karZarar >= 0 ? 't-up' : 't-down';
 
       const priceDisplay = isUsdBased
@@ -937,30 +870,29 @@ async function renderPortfolioView() {
         : formatPrice(price, item.symbol);
 
       return `<div class="market-section-card" style="padding: 16px;">
-        <div style="display:flex; justify-content: space-between; margin-bottom: 12px; align-items:center;">
-           <div style="font-family: var(--font-mono); font-size: 16px; font-weight: bold; cursor:pointer;" onclick="updateChart('${item.symbol}')">${item.symbol}</div>
-           <div class="change-pill ${cpClass}">${sign}%${chgPct}</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center;">
+          <div style="font-family:var(--font-mono); font-size:16px; font-weight:bold; cursor:pointer;" onclick="updateChart('${item.symbol}')">${item.symbol}</div>
+          <div class="change-pill ${cpClass}">${sign}%${chgPct}</div>
         </div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Miktar: <span style="color: var(--text-main); font-weight:500;">${item.amount}</span></div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Maliyet: <span style="color: var(--text-main); font-weight:500;">${avgPriceTRY > 0 ? '₺' + avgPriceTRY.toLocaleString('tr-TR') : '-'}</span></div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Güncel Fiyat: <span style="color: var(--text-main); font-weight:500;">${priceDisplay}</span></div>
-        
-        <div style="border-top: 1px solid var(--border-light); padding-top: 12px; display:flex; justify-content: space-between; align-items: center;">
-           <div>
-             <div style="font-size: 11px; color: var(--text-muted);">Toplam Değer (TRY)</div>
-             <div style="font-family: var(--font-mono); font-weight: 600;">₺${currentTotal.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
-           </div>
-           <div style="text-align: right;">
-             <div style="font-size: 11px; color: var(--text-muted);">Kâr / Zarar</div>
-             <div class="${kzClass}" style="font-family: var(--font-mono); font-weight: 600;">${karZarar !== 0 ? (karZarar >= 0 ? '+' : '') + '₺' + karZarar.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '-'}</div>
-           </div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px;">Miktar: <span style="color:var(--text-main); font-weight:500;">${item.amount}</span></div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px;">Maliyet: <span style="color:var(--text-main); font-weight:500;">${avgPriceTRY > 0 ? '₺' + avgPriceTRY.toLocaleString('tr-TR') : '-'}</span></div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Güncel Fiyat: <span style="color:var(--text-main); font-weight:500;">${priceDisplay}</span></div>
+        <div style="border-top:1px solid var(--border-light); padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:11px; color:var(--text-muted);">Toplam Değer (TRY)</div>
+            <div style="font-family:var(--font-mono); font-weight:600;">₺${currentTotal.toLocaleString('tr-TR', {minimumFractionDigits:2})}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:var(--text-muted);">Kâr / Zarar</div>
+            <div class="${kzClass}" style="font-family:var(--font-mono); font-weight:600;">${karZarar !== 0 ? (karZarar >= 0 ? '+' : '') + '₺' + karZarar.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '-'}</div>
+          </div>
         </div>
-        <button class="btn btn-full" style="margin-top: 12px; border-color: var(--down-bg); color: var(--down); background: var(--bg-app);" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Sat / Sil</button>
+        <button class="btn btn-full" style="margin-top:12px; border-color:var(--down-bg); color:var(--down); background:var(--bg-app);" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Sat / Sil</button>
       </div>`;
     } catch (e) {
-      return `<div class="market-section-card" style="padding: 16px; text-align:center;">
-         <div style="color: var(--down); margin-bottom: 10px;">Veri alınamadı: ${item.symbol}</div>
-         <button class="btn" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Listeden Kaldır</button>
+      return `<div class="market-section-card" style="padding:16px; text-align:center;">
+        <div style="color:var(--down); margin-bottom:10px;">Veri alınamadı: ${item.symbol}</div>
+        <button class="btn" onclick="deleteAsset('${item.symbol}', event); setTimeout(renderPortfolioView, 300);">Listeden Kaldır</button>
       </div>`;
     }
   }));
@@ -968,69 +900,63 @@ async function renderPortfolioView() {
   grid.innerHTML = cards.join('');
   if (totalEl) totalEl.textContent = `₺${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
 
-  // Toplam kâr/zarar ve yüzde
-  const pnlEl  = document.getElementById('portfolio-total-pnl');
-  const pctEl  = document.getElementById('portfolio-total-pct');
-  const cntEl  = document.getElementById('portfolio-asset-count');
+  const pnlEl = document.getElementById('portfolio-total-pnl');
+  const pctEl = document.getElementById('portfolio-total-pct');
+  const cntEl = document.getElementById('portfolio-asset-count');
 
   if (pnlEl) {
-    const sign = totalPnl >= 0 ? '+' : '';
-    pnlEl.textContent = totalPnl !== 0
-      ? `${sign}₺${totalPnl.toLocaleString('tr-TR', {minimumFractionDigits:2})}`
-      : '-';
+    const s = totalPnl >= 0 ? '+' : '';
+    pnlEl.textContent = totalPnl !== 0 ? `${s}₺${totalPnl.toLocaleString('tr-TR', {minimumFractionDigits:2})}` : '-';
     pnlEl.className = `psc-stat-val ${totalPnl >= 0 ? 'psc-up' : 'psc-down'}`;
   }
   if (pctEl && totalCost > 0) {
     const pct = ((totalPnl / totalCost) * 100).toFixed(2);
-    const sign = totalPnl >= 0 ? '+' : '';
-    pctEl.textContent = `${sign}%${pct}`;
+    const s   = totalPnl >= 0 ? '+' : '';
+    pctEl.textContent = `${s}%${pct}`;
     pctEl.className = `psc-stat-val ${totalPnl >= 0 ? 'psc-up' : 'psc-down'}`;
   }
   if (cntEl) cntEl.textContent = myAssets.length;
 }
-// ── AI PORTFÖY YÖNETİCİSİ ──────────────────────────────────────
-function openAiPortfolioModal() { document.getElementById('aiPortfolioModal').classList.add('open'); }
+
+// ── AI PORTFÖY YÖNETİCİSİ ────────────────────────────────────
+function openAiPortfolioModal()  { document.getElementById('aiPortfolioModal').classList.add('open'); }
 function closeAiPortfolioModal() { document.getElementById('aiPortfolioModal').classList.remove('open'); }
 
 async function generateAiPortfolio() {
-  const budget = document.getElementById('ai-budget').value;
-  const risk = document.getElementById('ai-risk').value;
+  const budget   = document.getElementById('ai-budget').value;
+  const risk     = document.getElementById('ai-risk').value;
   const category = document.getElementById('ai-category').value;
   const duration = document.getElementById('ai-duration').value;
 
-  if(!budget || budget <= 0) return toast('Lütfen geçerli bir bütçe girin', 'error');
+  if (!budget || budget <= 0) return toast('Lütfen geçerli bir bütçe girin', 'error');
 
   const btn = document.getElementById('btn-generate-portfolio');
   btn.textContent = "AI Analiz Ediyor... ⏳";
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE}/api/ai-portfolio`, {
+    const res  = await fetch(`${API_BASE}/api/ai-portfolio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ budget, risk, category, duration })
     });
     const data = await res.json();
-    
+
     if (data.success && data.portfolio) {
-      // Gelen varlıkları mevcut portföye ekliyoruz
       data.portfolio.forEach(item => {
-         const existing = myAssets.findIndex(a => a.symbol === item.symbol);
-         if (existing >= 0) {
-           myAssets[existing].amount += parseFloat(item.amount);
-         } else {
-           myAssets.push({ symbol: item.symbol, amount: parseFloat(item.amount), avgPrice: item.avgPrice || 0 });
-         }
+        const existing = myAssets.findIndex(a => a.symbol === item.symbol);
+        if (existing >= 0) {
+          myAssets[existing].amount += parseFloat(item.amount);
+        } else {
+          myAssets.push({ symbol: item.symbol, amount: parseFloat(item.amount), avgPrice: item.avgPrice || 0 });
+        }
       });
       safeSave('fs_assets', myAssets);
       closeAiPortfolioModal();
-      
-      // Ekranları yenile
       if (typeof renderPortfolioView === 'function') renderPortfolioView();
       if (typeof renderList === 'function') renderList();
-      
       toast('AI Portföyünüz başarıyla oluşturuldu! 🚀', 'success');
-      document.getElementById('ai-budget').value = ''; // Kutuyu temizle
+      document.getElementById('ai-budget').value = '';
     } else {
       toast('AI yanıt veremedi, tekrar deneyin.', 'error');
     }
@@ -1042,16 +968,11 @@ async function generateAiPortfolio() {
   }
 }
 
-// ── MOBİL ALT NAVİGASYON SYNC ────────────────────────────────
+// ── MOBİL NAVİGASYON ─────────────────────────────────────────
 function setMobileNav(el) {
   document.querySelectorAll('.mbn-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 }
-
-// showView'u wrap ederek mobil nav'ı da senkronize et
-const _origShowView = showView;
-// showView zaten tanımlı — sadece sonuna mobil nav sync ekleyelim
-// (DOMContentLoaded'da çağrılacak)
 
 // ── MOBİL ARAMA ──────────────────────────────────────────────
 function openMobileSearch() {
@@ -1069,7 +990,7 @@ function closeMobileSearch() {
   if (res) res.innerHTML = '';
 }
 
-// Mobil arama input dinleyicisi
+// ── BAŞLANGIÇ ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const mobileInp = document.getElementById('mobile-search-input');
   const mobileRes = document.getElementById('mobile-search-results');
@@ -1101,7 +1022,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Escape ile kapat
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeMobileSearch();
   });
@@ -1115,10 +1035,10 @@ document.addEventListener('DOMContentLoaded', () => {
       setMobileNav(mbnItem);
     };
   }
-});
+
+  // Başlangıç
   setupTheme();
   initDiscovery();
   showView('home-news-view');
-  // Preload sidebar if analysis mode later
   renderList();
-});
+}); // DOMContentLoaded sonu
