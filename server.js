@@ -73,24 +73,28 @@ app.get('/api/proxy/yahoo', async (req, res) => {
 // --- YENİ HABER ENDPOINT'İ (Daha fazla haber) ---
 app.get('/api/news', async (req, res) => {
   try {
-    // Hem ekonomi hem döviz/borsa etiketlerini çekip birleştiriyoruz
+    const apiKey = process.env.COLLECT_API_KEY;
+    console.log("COLLECT_API_KEY mevcut mu:", !!apiKey);
+    console.log("COLLECT_API_KEY ilk 10 karakter:", apiKey ? apiKey.substring(0, 10) : 'YOK');
+
     const tags = ['economy', 'exchange'];
     let allNews = [];
     
     for (let tag of tags) {
       const response = await axios.get(`https://api.collectapi.com/news/getNews?country=tr&tag=${tag}`, {
-        headers: { "authorization": process.env.COLLECT_API_KEY }
+        headers: { "authorization": apiKey }
       });
+      console.log(`Tag [${tag}] sonuç:`, response.data?.success, '| Haber sayısı:', response.data?.result?.length);
       if (response.data && response.data.success) {
         allNews = allNews.concat(response.data.result);
       }
     }
     
-    // Aynı URL'ye sahip haberleri filtrele (tekilleştirme)
     const uniqueNews = Array.from(new Map(allNews.map(item => [item.url, item])).values());
     res.json({ success: true, result: uniqueNews });
   } catch (error) {
-    res.status(500).json({ error: 'Haberler alınamadı' });
+    console.error("Haber hatası detay:", error.response?.status, error.response?.data || error.message);
+    res.status(500).json({ error: 'Haberler alınamadı', detay: error.response?.data || error.message });
   }
 });
 
