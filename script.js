@@ -12,6 +12,9 @@ const PROXY_MAX_RETRIES = 2;
 // ── STATE ─────────────────────────────────────────────────────
 let myAssets    = safeLoad('fs_assets', []);
 let watchlist   = safeLoad('fs_watchlist', ['XU100.IS', 'BTC-USD', 'USDTRY=X', 'GC=F']);
+// Firestore sync için global referanslar
+window.myAssets  = myAssets;
+window.watchlist = watchlist;
 let myChart     = null;
 let currentSym  = 'XU100.IS';
 let currentRange    = '1d';
@@ -26,10 +29,11 @@ function safeLoad(key, fallback) {
 }
 function safeSave(key, val) {
   try { 
-    // Önce cihazın tarayıcısına kaydet
-    localStorage.setItem(key, JSON.stringify(val)); 
-    
-    // YENİ: Eğer kullanıcı giriş yapmışsa, beklemeden arka planda Firebase'i de güncelle!
+    localStorage.setItem(key, JSON.stringify(val));
+    // Global referansları da güncelle (Firestore sync için)
+    if (key === 'fs_assets')    window.myAssets  = val;
+    if (key === 'fs_watchlist') window.watchlist = val;
+    // Giriş yapılmışsa Firebase'e de kaydet
     if (typeof window.syncToCloudSilent === 'function') {
       window.syncToCloudSilent();
     }
@@ -229,8 +233,8 @@ async function fetchGlobalMarkets() {
       { key:'cripto',sym:'BTC-USD',  name:'Bitcoin',  icon:'₿', label:'Kripto Paralar' },
       { key:'cripto',sym:'ETH-USD',  name:'Ethereum', icon:'₿', label:'Kripto Paralar' },
       { key:'cripto',sym:'SOL-USD',  name:'Solana',   icon:'₿', label:'Kripto Paralar' },
-      { key:'emtia', sym:'GC=F',    name:'Altın TRY', icon:'🏅', label:'Altın & Emtia' },
-      { key:'emtia', sym:'GC=F',     name:'Altın USD', icon:'🏅', label:'Altın & Emtia' },
+      { key:'emtia', sym:'GC=F',     name:'Altın (ONS)', icon:'🏅', label:'Altın & Emtia' },
+      { key:'emtia', sym:'EURUSD=X', name:'EUR/USD',   icon:'🏅', label:'Altın & Emtia' },
       { key:'emtia', sym:'USDTRY=X', name:'USD/TRY',  icon:'🏅', label:'Altın & Emtia' },
     ];
     const buckets = {};
@@ -423,7 +427,7 @@ async function updateChart(symbol) {
     const meta   = res.meta;
     
     // Fiyat verilerini işle
-    const prices = res.indicators.quote[0].close.map(p => p === null ? null : parseFloat(p.toFixed(4)));
+    const prices = res.indicators.quote[0].close.map(p => p === null ? null : parseFloat(p));
     const times  = res.timestamp.map(t => {
       const d = new Date(t * 1000);
       if (currentRange === '1d') return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -517,15 +521,23 @@ async function updateChart(symbol) {
 }
 
 function formatPrice(val, sym = '') {
-  if (val === null || val === undefined) return '-';
-  const isTL = sym.endsWith('.IS') || sym.includes('TRY');
-  const prefix = isTL ? '₺' : (sym.includes('USD') || sym.includes('-USD') ? '$' : '');
-  // BTC gibi büyük sayılarda ondalık gösterme, küçük değerlerde (döviz) 4 hane göster
-  let maxFrac = 2;
-  if (val >= 10000) maxFrac = 0;        // BTC, büyük fiyatlar
-  else if (val < 1) maxFrac = 4;        // Küçük kripto, kuruş altı
-  else if (val < 10) maxFrac = 3;       // Düşük fiyatlı varlıklar
-  return prefix + val.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
+  if (val === null || val === undefined || isNaN(val)) return '-';
+  const num = Number(val);
+  if (!isFinite(num)) return '-';
+  const isTL = sym.endsWith('.IS') || sym.includes('TRY') || sym.includes('GC') || sym.includes('=F');
+  const prefix = isTL ? '₺' : (sym.includes('-USD') || sym.includes('USD-') ? '$' : '');
+  // Fiyat büyüklüğüne göre ondalık hane belirle
+  let maxFrac;
+  if (num >= 100000) maxFrac = 0;       // BTC TL, büyük değerler
+  else if (num >= 1000) maxFrac = 0;    // BTC USD, altın
+  else if (num >= 10) maxFrac = 2;      // Normal hisse
+  else if (num >= 1) maxFrac = 3;       // Düşük fiyatlı
+  else maxFrac = 4;                     // Kuruş altı kripto
+  try {
+    return prefix + num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
+  } catch(e) {
+    return prefix + num.toFixed(maxFrac);
+  }
 }
 
 function setTimeframe(range, interval, e) {
