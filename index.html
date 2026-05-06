@@ -38,6 +38,14 @@
       }
     }
     initFirebase();
+    // Farklı tarayıcıda sayfa yenilendiğinde oturumun devam edip etmediğini kontrol et
+    const { onAuthStateChanged } = await import("[https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js)");
+    onAuthStateChanged(window.fbAuth, async (user) => {
+      if (user) {
+        setUserProfile(user);
+        await syncFromCloud(user.uid);
+      }
+    });
   </script>
 </head>
  
@@ -208,11 +216,12 @@
       </div>
 
       <!-- ── GÖRÜNÜM 4: Portföy ─────────────────────────────── -->
-      <div id="portfolio-view" class="view-container">
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 class="section-title" style="margin: 0;">Portföy Özeti</h3>
-            <button class="btn btn-primary" onclick="openModal()">+ Varlık Ekle</button>
+            <div style="display: flex; gap: 10px;">
+              <button class="ai-btn" onclick="openAiPortfolioModal()">🤖 AI Yönetimi</button>
+              <button class="btn btn-primary" onclick="openModal()">+ Varlık Ekle</button>
+            </div>
           </div>
           
           <div class="balance-card" style="max-width: 350px; margin-bottom: 24px;">
@@ -333,7 +342,47 @@
     </div>
   </div>
 </div>
- 
+ <!-- ══ AI PORTFÖY MODAL ═══════════════════════════════════════════ -->
+<div id="aiPortfolioModal" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAiPortfolioModal()">×</button>
+    <div class="modal-title">🤖 AI Portföy Yöneticisi</div>
+    <p class="modal-sub">Kriterlerinizi girin, bütçenizi otomatik dağıtsın.</p>
+    
+    <div class="form-group">
+      <label class="form-label">Bütçe (₺)</label>
+      <input type="number" id="ai-budget" class="form-input" placeholder="Örn: 50000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Risk Seviyesi</label>
+      <select id="ai-risk" class="form-input">
+        <option value="Düşük Risk (Muhafazakar, Sabit Getiri)">Düşük Risk</option>
+        <option value="Orta Risk (Dengeli Dağılım)" selected>Orta Risk</option>
+        <option value="Yüksek Risk (Agresif Büyüme)">Yüksek Risk</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Odak Kategori</label>
+      <select id="ai-category" class="form-input">
+        <option value="Karma (BİST, Kripto, Emtia Eşit)">Karma Portföy</option>
+        <option value="Sadece BİST 100 Hisseleri">BİST Ağırlıklı</option>
+        <option value="Kripto Paralar">Kripto Ağırlıklı</option>
+        <option value="Emtia ve Değerli Madenler">Emtia Ağırlıklı</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Yatırım Süresi</label>
+      <select id="ai-duration" class="form-input">
+        <option value="Kısa Vade (1-3 Ay)">Kısa Vade (1-3 Ay)</option>
+        <option value="Orta Vade (6-12 Ay)" selected>Orta Vade (6-12 Ay)</option>
+        <option value="Uzun Vade (1-5 Yıl)">Uzun Vade (1-5 Yıl)</option>
+      </select>
+    </div>
+    <div class="modal-footer" style="margin-top:10px;">
+      <button class="btn btn-primary btn-full" id="btn-generate-portfolio" onclick="generateAiPortfolio()">Analiz Et ve Portföye Ekle</button>
+    </div>
+  </div>
+</div>
 <!-- ══ LİBRARİES ═══════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>

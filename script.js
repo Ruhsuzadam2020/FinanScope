@@ -581,7 +581,9 @@ async function renderList() {
   const cards = await Promise.all(items.map(async item => {
     try {
       const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      // --- BUNUNLA DEĞİŞTİR ---
+      const meta = data?.chart?.result?.[0]?.meta || {};
+      const price = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
       const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
       const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
       const isUp  = parseFloat(chgPct) >= 0;
@@ -754,7 +756,9 @@ async function renderPortfolioView() {
   const cards = await Promise.all(myAssets.map(async item => {
     try {
       const data = await proxyFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?range=1d&interval=1m`);
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      // --- BUNUNLA DEĞİŞTİR ---
+      const meta = data?.chart?.result?.[0]?.meta || {};
+      const price = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose || 0;
       const prev  = data?.chart?.result?.[0]?.meta?.previousClose || price;
       const chgPct = prev ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
       const isUp  = parseFloat(chgPct) >= 0;
@@ -797,6 +801,59 @@ async function renderPortfolioView() {
 
   grid.innerHTML = cards.join('');
   if (totalEl) totalEl.textContent = `₺${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+}
+// ── AI PORTFÖY YÖNETİCİSİ ──────────────────────────────────────
+function openAiPortfolioModal() { document.getElementById('aiPortfolioModal').classList.add('open'); }
+function closeAiPortfolioModal() { document.getElementById('aiPortfolioModal').classList.remove('open'); }
+
+async function generateAiPortfolio() {
+  const budget = document.getElementById('ai-budget').value;
+  const risk = document.getElementById('ai-risk').value;
+  const category = document.getElementById('ai-category').value;
+  const duration = document.getElementById('ai-duration').value;
+
+  if(!budget || budget <= 0) return toast('Lütfen geçerli bir bütçe girin', 'error');
+
+  const btn = document.getElementById('btn-generate-portfolio');
+  btn.textContent = "AI Analiz Ediyor... ⏳";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('[https://finanscope.onrender.com/api/ai-portfolio](https://finanscope.onrender.com/api/ai-portfolio)', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ budget, risk, category, duration })
+    });
+    const data = await res.json();
+    
+    if (data.success && data.portfolio) {
+      // Gelen varlıkları mevcut portföye ekliyoruz
+      data.portfolio.forEach(item => {
+         const existing = myAssets.findIndex(a => a.symbol === item.symbol);
+         if (existing >= 0) {
+           myAssets[existing].amount += parseFloat(item.amount);
+         } else {
+           myAssets.push({ symbol: item.symbol, amount: parseFloat(item.amount), avgPrice: item.avgPrice || 0 });
+         }
+      });
+      safeSave('fs_assets', myAssets);
+      closeAiPortfolioModal();
+      
+      // Ekranları yenile
+      if (typeof renderPortfolioView === 'function') renderPortfolioView();
+      if (typeof renderList === 'function') renderList();
+      
+      toast('AI Portföyünüz başarıyla oluşturuldu! 🚀', 'success');
+      document.getElementById('ai-budget').value = ''; // Kutuyu temizle
+    } else {
+      toast('AI yanıt veremedi, tekrar deneyin.', 'error');
+    }
+  } catch(e) {
+    toast('Bağlantı hatası.', 'error');
+  } finally {
+    btn.textContent = "Analiz Et ve Portföye Ekle";
+    btn.disabled = false;
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────

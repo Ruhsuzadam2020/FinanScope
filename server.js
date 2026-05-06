@@ -70,14 +70,58 @@ app.get('/api/proxy/yahoo', async (req, res) => {
     res.status(500).json({ error: 'Veri çekilemedi' });
   }
 });
+// --- YENİ HABER ENDPOINT'İ (Daha fazla haber) ---
 app.get('/api/news', async (req, res) => {
   try {
-    const response = await axios.get("https://api.collectapi.com/news/getNews?country=tr&tag=economy", {
-      headers: { "authorization": process.env.COLLECT_API_KEY }
-    });
-    res.json(response.data);
+    // Hem ekonomi hem döviz/borsa etiketlerini çekip birleştiriyoruz
+    const tags = ['economy', 'exchange'];
+    let allNews = [];
+    
+    for (let tag of tags) {
+      const response = await axios.get(`https://api.collectapi.com/news/getNews?country=tr&tag=${tag}`, {
+        headers: { "authorization": process.env.COLLECT_API_KEY }
+      });
+      if (response.data && response.data.success) {
+        allNews = allNews.concat(response.data.result);
+      }
+    }
+    
+    // Aynı URL'ye sahip haberleri filtrele (tekilleştirme)
+    const uniqueNews = Array.from(new Map(allNews.map(item => [item.url, item])).values());
+    res.json({ success: true, result: uniqueNews });
   } catch (error) {
     res.status(500).json({ error: 'Haberler alınamadı' });
+  }
+});
+
+// --- YENİ AI PORTFÖY YÖNETİCİSİ ENDPOINT'İ ---
+app.post('/api/ai-portfolio', async (req, res) => {
+  const { budget, risk, category, duration } = req.body;
+  try {
+    const ai = new GoogleGenAI({});
+    // AI'yı katı kurallarla yapılandırıyoruz ki sadece JSON döndürsün
+    const prompt = `Sen uzman bir fon yöneticisisin. Elimde ${budget}₺ bütçe var. 
+    Risk seviyem: ${risk}. Odaklanmak istediğim varlık sınıfı: ${category}. Vade: ${duration}.
+    Bana mantıklı bir portföy dağılımı yap.
+    SADECE VE SADECE aşağıdaki JSON formatında bir dizi döndür, hiçbir ek metin, açıklama veya markdown backtick'i yazma:
+    [
+      {"symbol": "THYAO.IS", "amount": 100, "avgPrice": 0},
+      {"symbol": "BTC-USD", "amount": 0.05, "avgPrice": 0}
+    ]`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+
+    // AI bazen ```json etiketleri koyabiliyor, onları temizliyoruz
+    let rawText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const portfolio = JSON.parse(rawText);
+    
+    res.json({ success: true, portfolio });
+  } catch (error) {
+    console.error("AI Portföy Hatası:", error);
+    res.status(500).json({ error: 'AI portföy oluşturamadı.' });
   }
 });
 
