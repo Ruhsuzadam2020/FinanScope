@@ -45,6 +45,35 @@ app.post('/api/ai-analyze', async (req, res) => {
   }
 });
 
+let cachedCookie = '';
+let cachedCrumb = '';
+
+async function getYahooAuth() {
+  if (cachedCookie && cachedCrumb) return { cookie: cachedCookie, crumb: cachedCrumb };
+  try {
+    // 1. Yahoo'dan oturum çerezi (Cookie) al
+    const cookieRes = await axios.get('https://fc.yahoo.com', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      validateStatus: () => true // 404/502 dönse bile çerezi verir
+    });
+    const setCookieHeader = cookieRes.headers['set-cookie'];
+    if (setCookieHeader) cachedCookie = setCookieHeader[0].split(';')[0];
+
+    // 2. Bu çerezle Crumb (Güvenlik şifresi) al
+    const crumbRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Cookie': cachedCookie
+      }
+    });
+    cachedCrumb = crumbRes.data;
+    return { cookie: cachedCookie, crumb: cachedCrumb };
+  } catch (e) {
+    console.error("Yahoo Auth Hatası:", e.message);
+    return { cookie: '', crumb: '' };
+  }
+}
+
 // Yahoo Finance İçin Özel Backend Proxy'miz
 app.get('/api/proxy/yahoo', async (req, res) => {
   try {
@@ -71,25 +100,32 @@ app.get('/api/proxy/yahoo', async (req, res) => {
   }
 });
 
-// Yahoo Finance İstatistik ve Temel Veri Proxy'miz
 app.get('/api/proxy/yahoo-summary', async (req, res) => {
   try {
     const { symbol } = req.query;
     if (!symbol) return res.status(400).json({ error: 'Sembol gerekli' });
     
-    // summaryDetail, defaultKeyStatistics, financialData, calendarEvents modüllerini çekiyoruz
-    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=summaryDetail,defaultKeyStatistics,financialData,calendarEvents`;
+    // Güvenlik biletini al
+    const { cookie, crumb } = await getYahooAuth();
+    
+    // URL'nin sonuna &crumb= ekliyoruz
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=summaryDetail,defaultKeyStatistics,financialData,calendarEvents&crumb=${crumb}`;
     
     const response = await axios.get(url, {
       headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Accept': 'application/json'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Cookie': cookie // Aldığımız çerezi yolluyoruz
+      },
+      timeout: 8000
     });
     res.json(response.data);
   } catch (error) {
-    console.error("Yahoo Summary Hatası:", error.message);
-    res.status(500).json({ error: 'İstatistikler çekilemedi' });
+    // Eğer güvenlik bileti zaman aşımına uğradıysa sıfırla ki bir sonrakinde yenisini alsın
+    if (error.response && error.response.status === 401) {
+      cachedCookie = ''; cachedCrumb = '';
+    }
+    // Hata olsa bile frontend'i çökertmemek için boş obje dön
+    res.json({ quoteSummary: { result: [] } });
   }
 });
 // --- YENİ HABER ENDPOINT'İ (Daha fazla haber) ---
