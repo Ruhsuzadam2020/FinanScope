@@ -179,36 +179,28 @@ function renderNews(news) {
       const img = n.image
         ? n.image.replace(/w=\d+/, 'w=1200').replace(/q=\d+/, 'q=85')
         : 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=85';
+      
       return `
-      <div class="swiper-slide" onclick="window.open('${n.url}','_blank')" style="position:relative;overflow:hidden;">
+      <div class="swiper-slide" onclick="window.open('${n.url}','_blank')" style="position:relative; overflow:hidden; background:#0d1320;">
         
-        <!-- Arkaplan: aynı fotoğraf 3 kez yan yana, blur ile -->
         <div style="
-          position:absolute; inset:0;
-          display:flex; align-items:stretch;
-          filter:blur(18px) brightness(0.45) saturate(1.3);
-          transform:scale(1.08);
-        ">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="flex:1;object-fit:cover;width:33.33%;">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="flex:1;object-fit:cover;width:33.33%;">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="flex:1;object-fit:cover;width:33.33%;">
-        </div>
+          position: absolute; 
+          inset: 0;
+          background-image: url('${img}');
+          background-size: auto 100%; /* Yüksekliği tam doldur, genişliği orantılı bırak */
+          background-repeat: repeat-x; /* Görseli yatay eksende (x) yan yana tekrarla */
+          background-position: center; /* Merkeze hizala */
+        "></div>
 
-        <!-- Ön plan: 3 kez yan yana, net görüntü -->
         <div style="
-          position:absolute; inset:0;
-          display:flex; align-items:center; justify-content:center;
-          gap:0;
-        ">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="height:100%;width:33.33%;object-fit:cover;object-position:center;">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="height:100%;width:33.33%;object-fit:cover;object-position:center;">
-          <img src="${img}" onerror="this.src='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=70'" style="height:100%;width:33.33%;object-fit:cover;object-position:center;">
-        </div>
+          position: absolute; 
+          inset: 0;
+          background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
+        "></div>
 
-        <!-- Alt yazı overlay -->
-        <div class="slide-overlay" style="position:absolute;bottom:0;left:0;right:0;z-index:10;">
+        <div class="slide-overlay" style="position:absolute; bottom:0; left:0; right:0; z-index:10; padding: 40px 22px 20px;">
           <div class="slide-tag">${n.source || 'Ekonomi'}</div>
-          <div class="slide-title">${n.name}</div>
+          <div class="slide-title" style="color: white; text-shadow: 0px 2px 6px rgba(0,0,0,0.8);">${n.name}</div>
         </div>
       </div>`;
     }).join('');
