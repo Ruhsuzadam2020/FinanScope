@@ -385,11 +385,21 @@ function renderMarkets({ endpoints, results }) {
     const rows = sec.items.map(item => {
       let displayName = item.text || item.name;
       let clickSym = item._sym;
+      let clickSym = item._sym;
       if (!clickSym) {
         if (sec.key === 'cripto') {
           clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
         } else if (sec.key === 'bist') {
           clickSym = item.code || displayName;
+        } else if (sec.key === 'emtia') {
+          // YENİ EKLENEN BLOK: CollectAPI'den gelen yerel altınları Global Yahoo kodlarına yönlendir
+          if (displayName.toLowerCase().includes('altın')) {
+             clickSym = 'GC=F'; // Global ONS Altın
+          } else if (displayName.toLowerCase().includes('gümüş')) {
+             clickSym = 'SI=F'; // Global ONS Gümüş
+          } else {
+             clickSym = displayName;
+          }
         } else {
           clickSym = displayName;
         }
@@ -473,12 +483,15 @@ async function updateChart(symbol) {
   let sym = symbol.trim().toUpperCase();
   const cryptoList = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'AVAX', 'DOGE', 'TRX', 'DOT'];
 
-  if (cryptoList.includes(sym)) {
+  // YENİ EKLENEN KURAL: Altın Sertifikasını direkt yakala
+  if (sym === 'ALTINS1' || sym === 'ALTIN S1' || sym === 'ALTIN.S1') {
+    sym = 'ALTINS1.IS';
+  } else if (cryptoList.includes(sym)) {
     // Bilinen kripto — direkt -USD ekle
     sym += '-USD';
   } else if (sym.startsWith('^') || sym.includes('.') || sym.includes('=') || sym.includes('-')) {
     // Zaten tam sembol (^GSPC, THYAO.IS, USDTRY=X, BTC-USD) — dokunma
-  } else {
+  }else {
     // Belirsiz sembol — Yahoo'ya sor, doğru sembolü o söylesin
     try {
       const searchData = await proxyFetch(
@@ -768,6 +781,7 @@ function switchTab(tab, e) {
 function initDiscovery() {
   const chips = [
     { sym: 'XU100.IS', label: 'BIST 100' },
+    { sym: 'ALTINS1.IS', label: 'AltınS1' },
     { sym: 'USDTRY=X',  label: 'USD/TRY' },
     { sym: 'EURTRY=X',  label: 'EUR/TRY' },
     { sym: 'GC=F',      label: 'Altın' },
