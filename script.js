@@ -328,10 +328,10 @@ async function fetchGlobalMarkets() {
   await fetchGlobalExchanges(results);
   renderMarkets(marketsCache);
 }
-
-// HATA DÜZELTMESİ: fetchGlobalExchanges ayrı, düzgün kapatılmış fonksiyon
 async function fetchGlobalExchanges(results) {
   const globalSymbols = [
+    // YENİ: Darphane Altın Sertifikasını (ALTINS1) BIST listesine zorla ekliyoruz
+    { key:'bist', sym:'ALTINS1.IS', name:'Darphane Altın S1', icon:'🇹🇷', label:'Borsa İstanbul' },
     { key:'us', sym:'^GSPC',   name:'S&P 500',    icon:'🇺🇸', label:'ABD Piyasaları' },
     { key:'us', sym:'^DJI',    name:'Dow Jones',   icon:'🇺🇸', label:'ABD Piyasaları' },
     { key:'us', sym:'^IXIC',   name:'NASDAQ',      icon:'🇺🇸', label:'ABD Piyasaları' },
@@ -355,10 +355,19 @@ async function fetchGlobalExchanges(results) {
       const prev  = d?.chart?.result?.[0]?.meta?.previousClose || price;
       const rate  = prev && price ? ((price - prev) / prev * 100).toFixed(2) : '0.00';
       if (!results[fb.key]) results[fb.key] = { key: fb.key, label: fb.label, icon: fb.icon, items: [] };
-      if (price) results[fb.key].items.push({ text: fb.name, lastprice: price.toLocaleString('en-US', {maximumFractionDigits:2}), rate, _sym: fb.sym });
+      
+      if (price) {
+        // YENİ: Eklenen sembolleri listenin EN BAŞINA koyuyoruz (.unshift)
+        results[fb.key].items.unshift({ 
+          text: fb.name, 
+          lastprice: price.toLocaleString('en-US', {maximumFractionDigits:2}), 
+          rate, 
+          _sym: fb.sym 
+        });
+      }
     } catch(e) { /* sessizce atla */ }
   }));
-} // <-- HATA DÜZELTMESİ: fetchGlobalExchanges düzgün kapatıldı
+}
 
 // HATA DÜZELTMESİ: renderMarkets artık bağımsız fonksiyon (fetchGlobalExchanges içinde değil)
 function renderMarkets({ endpoints, results }) {
@@ -382,48 +391,58 @@ function renderMarkets({ endpoints, results }) {
 
   grid.innerHTML = Object.values(results).map(sec => {
     if (!sec?.items?.length) return '';
-    const rows = sec.items.map(item => {
-      let displayName = item.text || item.name;
-      let clickSym = item._sym;
-      if (!clickSym) {
-        if (sec.key === 'cripto') {
-          clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
-        } else if (sec.key === 'bist') {
-          clickSym = item.code || displayName;
-        } else if (sec.key === 'emtia') {
-          // YENİ EKLENEN BLOK: CollectAPI'den gelen yerel altınları Global Yahoo kodlarına yönlendir
-          if (displayName.toLowerCase().includes('altın')) {
-             clickSym = 'GC=F'; // Global ONS Altın
-          } else if (displayName.toLowerCase().includes('gümüş')) {
-             clickSym = 'SI=F'; // Global ONS Gümüş
-          } else {
-             clickSym = displayName;
+   const rows = sec.items.map(item => {
+          let displayName = item.text || item.name;
+          let clickSym = item._sym;
+          let isLocalGold = false; // YENİ: Fiziksel altın kontrolü
+
+          if (!clickSym) {
+            if (sec.key === 'cripto') {
+              clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
+            } else if (sec.key === 'bist') {
+              clickSym = item.code || displayName;
+            } else if (sec.key === 'emtia') {
+              if (displayName.toLowerCase().includes('ons')) {
+                 clickSym = 'GC=F';
+              } else if (displayName.toLowerCase().includes('gümüş')) {
+                 clickSym = 'SI=F';
+              } else if (displayName.toLowerCase().includes('altın')) {
+                 // YENİ: Global borsada olmayan fiziksel altınları işaretliyoruz
+                 isLocalGold = true;
+              } else {
+                 clickSym = displayName;
+              }
+            } else {
+              clickSym = displayName;
+            }
           }
-        } else {
-          clickSym = displayName;
-        }
-      }
-      let rawPrice = item.lastprice || item.buying || item.price || '-';
-      let rateText = item.rate || item.change || item.changeDay || '0.00';
-      let rate = parseFloat(rateText);
-      let cpClass = rate > 0 ? 'cp-up' : rate < 0 ? 'cp-down' : 'cp-flat';
-      let sign = rate > 0 ? '+' : '';
-      const isUSD = sec.key === 'us' || sec.key === 'global' || sec.key === 'cripto';
-      const currency = isUSD ? '$' : '₺';
-      const subLabel = sec.key === 'bist' ? 'BIST'
-        : sec.key === 'cripto' ? 'Kripto'
-        : sec.key === 'us'     ? 'ABD'
-        : sec.key === 'global' ? 'Global'
-        : 'Emtia';
-      return `<div class="asset-row" onclick="updateChart('${clickSym}')">
-        <div>
-          <div class="ar-name">${displayName}</div>
-          <div class="ar-sub">${subLabel}</div>
-        </div>
-        <div class="ar-price">${currency}${rawPrice}</div>
-        <div class="change-pill ${cpClass}">${sign}%${rateText}</div>
-      </div>`;
-    }).join('');
+          let rawPrice = item.lastprice || item.buying || item.price || '-';
+          let rateText = item.rate || item.change || item.changeDay || '0.00';
+          let rate = parseFloat(rateText);
+          let cpClass = rate > 0 ? 'cp-up' : rate < 0 ? 'cp-down' : 'cp-flat';
+          let sign = rate > 0 ? '+' : '';
+          const isUSD = sec.key === 'us' || sec.key === 'global' || sec.key === 'cripto';
+          const currency = isUSD ? '$' : '₺';
+          const subLabel = sec.key === 'bist' ? 'BIST'
+            : sec.key === 'cripto' ? 'Kripto'
+            : sec.key === 'us'     ? 'ABD'
+            : sec.key === 'global' ? 'Global'
+            : 'Emtia';
+
+          // YENİ: Fiziksel altına tıklanınca grafik açmaya çalışmak yerine uyarı ver
+          const onClickAction = isLocalGold 
+            ? `toast('Fiziksel Kapalıçarşı altınları için global grafik bulunmuyor.', 'info')` 
+            : `updateChart('${clickSym}')`;
+
+          return `<div class="asset-row" onclick="${onClickAction}">
+            <div>
+              <div class="ar-name">${displayName}</div>
+              <div class="ar-sub">${subLabel}</div>
+            </div>
+            <div class="ar-price">${currency}${rawPrice}</div>
+            <div class="change-pill ${cpClass}">${sign}%${rateText}</div>
+          </div>`;
+        }).join('');
     return `<div class="market-section-card">
       <div class="msc-header"><span>${sec.icon}</span> ${sec.label}</div>
       ${rows}
