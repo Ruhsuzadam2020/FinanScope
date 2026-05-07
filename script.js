@@ -461,7 +461,7 @@ async function updateChart(symbol) {
     // Belirsiz sembol — Yahoo'ya sor, doğru sembolü o söylesin
     try {
       const searchData = await proxyFetch(
-        \`https://query1.finance.yahoo.com/v1/finance/search?q=\${encodeURIComponent(sym)}&quotesCount=1\`
+        `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&quotesCount=1`
       );
       const hit = searchData?.quotes?.[0];
       if (hit?.symbol) {
