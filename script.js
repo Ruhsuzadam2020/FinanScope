@@ -385,7 +385,6 @@ function renderMarkets({ endpoints, results }) {
     const rows = sec.items.map(item => {
       let displayName = item.text || item.name;
       let clickSym = item._sym;
-      let clickSym = item._sym;
       if (!clickSym) {
         if (sec.key === 'cripto') {
           clickSym = CRYPTO_MAP[displayName] || (item.code ? item.code + '-USD' : displayName + '-USD');
