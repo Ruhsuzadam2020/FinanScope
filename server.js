@@ -70,6 +70,28 @@ app.get('/api/proxy/yahoo', async (req, res) => {
     res.status(500).json({ error: 'Veri çekilemedi' });
   }
 });
+
+// Yahoo Finance İstatistik ve Temel Veri Proxy'miz
+app.get('/api/proxy/yahoo-summary', async (req, res) => {
+  try {
+    const { symbol } = req.query;
+    if (!symbol) return res.status(400).json({ error: 'Sembol gerekli' });
+    
+    // summaryDetail, defaultKeyStatistics, financialData, calendarEvents modüllerini çekiyoruz
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=summaryDetail,defaultKeyStatistics,financialData,calendarEvents`;
+    
+    const response = await axios.get(url, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'application/json'
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Yahoo Summary Hatası:", error.message);
+    res.status(500).json({ error: 'İstatistikler çekilemedi' });
+  }
+});
 // --- YENİ HABER ENDPOINT'İ (Daha fazla haber) ---
 app.get('/api/news', async (req, res) => {
   try {

@@ -640,7 +640,7 @@ async function updateChart(symbol) {
     if (loader) loader.style.display = 'none';
     toast("Bir ağ hatası oluştu.", "error");
   }
-
+  fetchStockStats(sym);
   renderList();
 }
 
@@ -1058,6 +1058,70 @@ function closeMobileSearch() {
   if (inp) inp.value = '';
   const res = document.getElementById('mobile-search-results');
   if (res) res.innerHTML = '';
+}
+
+// ── HİSSE DETAY VE İSTATİSTİKLERİ ─────────────────────────────
+async function fetchStockStats(sym) {
+  const container = document.getElementById('stock-stats-container');
+  const grid = document.getElementById('stock-stats-grid');
+  if (!container || !grid) return;
+  
+  // Sadece hisse senetlerinde ve endekslerde göster (Kriptoda bazı veriler anlamsız olur)
+  container.style.display = 'block';
+  grid.innerHTML = `<div class="loading-spinner-box" style="grid-column:1/-1; padding: 20px 0;"><div class="spin-icon"></div><span>İstatistikler çekiliyor...</span></div>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/proxy/yahoo-summary?symbol=${encodeURIComponent(sym)}`);
+    const data = await res.json();
+    const result = data?.quoteSummary?.result?.[0];
+    
+    if (!result) throw new Error("Veri bulunamadı");
+
+    const summary = result.summaryDetail || {};
+    const stats = result.defaultKeyStatistics || {};
+    const fin = result.financialData || {};
+    const cal = result.calendarEvents?.earnings?.earningsDate?.[0] || {};
+
+    // Null/Undefined korumalı formatlayıcı
+    const fmt = (obj, suffix = '') => (obj && obj.fmt) ? obj.fmt + suffix : '-';
+    const fmtPct = (obj) => (obj && obj.raw) ? (obj.raw * 100).toFixed(2) + '%' : '-';
+
+    const statData = [
+      { label: 'Önceki Kapanış', val: fmt(summary.previousClose) },
+      { label: 'Açılış', val: fmt(summary.open) },
+      { label: 'Alış / Satış', val: `${fmt(summary.bid)} / ${fmt(summary.ask)}` },
+      { label: 'Gün Aralığı', val: `${fmt(summary.dayLow)} - ${fmt(summary.dayHigh)}` },
+      { label: '52 Hafta Aralığı', val: `${fmt(summary.fiftyTwoWeekLow)} - ${fmt(summary.fiftyTwoWeekHigh)}` },
+      { label: '1 Yıllık Değişim', val: fmtPct(stats['52WeekChange']) },
+      { label: 'Hacim', val: fmt(summary.volume) },
+      { label: 'Ort. Hacim (3 Ay)', val: fmt(summary.averageVolume) },
+      { label: 'Piyasa Değeri', val: fmt(summary.marketCap) },
+      { label: 'Tedavüldeki Hisse', val: fmt(stats.sharesOutstanding) },
+      { label: 'Fiyat/Kazanç (F/K)', val: fmt(summary.trailingPE) },
+      { label: 'Hisse Başına Kâr (EPS)', val: fmt(stats.trailingEps) },
+      { label: 'Sonraki Bilanço', val: fmt(cal) },
+      { label: 'Temettü Verimi', val: fmtPct(summary.dividendYield) },
+      { label: 'Gelir (Revenue)', val: fmt(fin.totalRevenue) },
+      { label: 'Net Kâr', val: fmt(fin.netIncomeToCommon) },
+      { label: 'Brüt Kâr Marjı', val: fmtPct(fin.grossMargins) },
+      { label: 'Aktif Kârlılığı (ROA)', val: fmtPct(fin.returnOnAssets) },
+      { label: 'Özkaynak Getirisi (ROE)', val: fmtPct(fin.returnOnEquity) },
+      { label: 'Fiyat/Defter Değeri', val: fmt(stats.priceToBook) },
+      { label: 'Defter Değeri/Hisse', val: fmt(stats.bookValue) },
+      { label: 'FAVÖK (EBITDA)', val: fmt(fin.ebitda) },
+      { label: 'KD / FAVÖK', val: fmt(stats.enterpriseToEbitda) }
+    ];
+
+    grid.innerHTML = statData.map(s => `
+      <div class="stat-item">
+        <span class="stat-label">${s.label}</span>
+        <span class="stat-value">${s.val}</span>
+      </div>
+    `).join('');
+
+  } catch (error) {
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted); font-size:12px; padding: 20px 0;">Bu varlık için temel analiz verisi bulunamadı.</div>`;
+  }
 }
 
 // ── BAŞLANGIÇ ────────────────────────────────────────────────

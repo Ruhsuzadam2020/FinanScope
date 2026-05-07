@@ -1053,6 +1053,37 @@ body.analysis-mode .side-panel { display: flex; }
   background: var(--bg-app); border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+
+/* ── İSTATİSTİK GRID TASARIMI ────────────────────────────── */
+.stats-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px 24px;
+}
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+.stat-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.stat-value {
+  color: var(--text-main);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: right;
+}
 .pstat-val { font-family: var(--font-mono); font-size: 22px; font-weight: 500; color: var(--accent); }
 .pstat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .profile-actions { display: flex; gap: 9px; }
