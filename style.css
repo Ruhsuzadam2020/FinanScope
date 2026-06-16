@@ -860,7 +860,84 @@ body.analysis-mode .side-panel { display: flex; }
   }
   .canvas-wrap { height: 260px; }
   .timeframe-bar { overflow-x: auto; width: 100%; }
+/* ============================================================
+   MOBİL GRAFİK VE ANALİZ SAYFASI İYİLEŞTİRMELERİ (≤640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  
+  /* 1. Grafik Üst Barını Dikey ve Düzenli Hale Getir */
+  #analysis-view .chart-top-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
 
+  /* Fiyat ve Değişim Yüzdesini Yan Yana Düzgünce Hizala */
+  #analysis-view .price-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  /* 2. Grafik Butonlarını Mobil Uyumlu Grid Yap */
+  #analysis-view .chart-btns {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2'li şık bir buton düzeni */
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* Butonların mobil boyutlarını ve dokunma alanlarını standartlaştır */
+  #analysis-view .chart-btns button, 
+  #analysis-view .chart-btns a {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 8px !important; /* Parmakla rahat basılması için */
+    font-size: 12px !important;
+    font-weight: 600;
+    white-space: nowrap;
+    border-radius: var(--radius-sm);
+  }
+
+  /* 3. Zaman Dilimi Butonları Barı (1G, 5G, 1A...) */
+  #analysis-view .timeframe-bar {
+    display: flex;
+    width: 100%;
+    overflow-x: auto; /* Taşma durumunda sağa sola kaysın */
+    padding: 4px;
+    background: var(--bg-app);
+    border-radius: var(--radius-sm);
+    gap: 4px;
+    -webkit-overflow-scrolling: touch; /* iOS kaydırma momentumu */
+  }
+
+  #analysis-view .time-btn {
+    flex: 1; /* Tüm butonlar eşit genişlikte yayılsın */
+    min-width: 48px;
+    padding: 8px 4px !important;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  /* 4. Mobil Grafik Alanı Yüksekliği */
+  #analysis-view .canvas-wrap {
+    height: 280px !important; /* Mobilde dikey alanı çok kaplamasın */
+  }
+
+  /* 5. Önemli İstatistikler Grid Düzeni (Mobilde Tek Kolon) */
+  #analysis-view .stats-grid {
+    grid-template-columns: 1fr !important; /* Üst üste temiz liste görünümü */
+    gap: 8px;
+  }
+
+  #analysis-view .stat-item {
+    padding: 10px 0;
+    font-size: 13px;
+  }
+}
   /* Analysis sidebar → tam genişlik yatay scroll */
   body.analysis-mode .main-layout { grid-template-columns: 1fr; }
   body.analysis-mode .side-panel {
