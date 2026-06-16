@@ -195,139 +195,79 @@ app.post('/api/ai-portfolio', async (req, res) => {
 
 // --- YENİ: Yükselenler, Düşenler ve Sektörel Veri Proxy Endpoint'leri ---
 
-// 1. En Çok Yükselenler (Gainers)
+// --- YENİ: Yükselenler, Düşenler ve Sektörel Veri Proxy Endpoint'leri ---
+
+// 1. En Çok Yükselenler (Gainers) - Stabil V8 Endpoint'i
 app.get('/api/proxy/yahoo-gainers', async (req, res) => {
   try {
-    // BIST için en çok yükselen trendleri tarar
-    const url = 'https://query1.finance.yahoo.com/v1/finance/trending/TR';
-    const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    res.json(response.data);
+    const trendPool = ['THYAO.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'SASA.IS', 'EREGL.IS', 'FROTO.IS', 'TOASO.IS', 'TUPRS.IS', 'KOCHL.IS'];
+    const results = [];
+
+    await Promise.all(trendPool.map(async (sym) => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=1d`;
+        const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const meta = response.data?.chart?.result?.[0]?.meta;
+        if (meta) {
+          const price = meta.regularMarketPrice;
+          const prev = meta.previousClose || price;
+          const chgPct = prev && price ? ((price - prev) / prev * 100) : 0;
+          results.push({ symbol: sym, shortName: sym.replace('.IS', ''), regularMarketPrice: price, regularMarketChangePercent: chgPct });
+        }
+      } catch (e) { /* Hata veren sembolü sessizce atla */ }
+    }));
+
+    results.sort((a, b) => b.regularMarketChangePercent - a.regularMarketChangePercent);
+    res.json({ success: true, result: results });
   } catch (error) {
-    console.error("Gainers hatası:", error.message);
-    res.status(500).json({ error: 'Veri çekilemedi' });
+    res.json({ success: false, result: [] }); // 500 fırlatıp uygulamayı çökertmesini engelledik
   }
 });
 
-// 2. Sektör bazlı sembolleri getiren dinamik listeleme
+// 2. Sektör bazlı sembolleri getiren dinamik listeleme - Stabil V8 Endpoint'i
 app.get('/api/proxy/yahoo-sector', async (req, res) => {
   const { sector } = req.query;
+  const cleanSector = (sector || '').trim(); // HTML'deki " temettu" gibi boşlukları temizler
+  
   try {
-    // Kullanıcının seçtiği sektöre göre Yahoo Finance üzerinde hazır tanımlı sembol setleri veya arama sorguları üretilir
-    // Yerel örnek BIST hisselerini eşleştiren bir havuz:
     const sectorPool = {
-      teknoloji: [
-    'ASELS.IS', 'NETAS.IS', 'KFEIN.IS', 'MIATK.IS',
-    'LOGO.IS', 'FONET.IS', 'ARENA.IS', 'INDES.IS',
-    'LINK.IS', 'PAPIL.IS', 'SMART.IS', 'ARDYZ.IS',
-    'DESPC.IS', 'DGATE.IS', 'ESCOM.IS', 'HTTBT.IS'
-  ],
-
-  nasdaq_teknoloji: [
-    'MSFT', 'AAPL', 'ADBE', 'MDB', 'PLTR', 'INTU',
-    'CRWD', 'DDOG', 'SNOW', 'ORCL', 'GOOGL',
-    'META', 'NFLX', 'AMZN', 'SHOP', 'PANW'
-  ],
-
-  yapay_zeka_cip: [
-    'NVDA', 'AMD', 'AVGO', 'ARM', 'MU',
-    'TSM', 'MRVL', 'INTC', 'QCOM', 'ASML'
-  ],
-
-  savunma: [
-    'ASELS.IS', 'OTKAR.IS', 'KATMR.IS', 'PAPIL.IS',
-    'KTOS', 'AVAV'
-  ],
-
-  saglik: [
-    'ECILC.IS', 'RTALB.IS', 'SELEC.IS', 'MEDTR.IS',
-    'DEVA.IS', 'LKMNH.IS', 'MPARK.IS',
-    'AMGN', 'GILD', 'VRTX', 'REGN', 'MRNA'
-  ],
-
-  enerji: [
-    'AKSEN.IS', 'ALARK.IS', 'CWENE.IS', 'EUPWR.IS',
-    'ASTOR.IS', 'ENERY.IS', 'SMRTG.IS',
-    'ENPH', 'FSLR', 'RUN', 'BE'
-  ],
-
-  metal: [
-    'EREGL.IS', 'KRDMD.IS', 'ISDMR.IS',
-    'BRSAN.IS', 'CEMAS.IS', 'IZMDC.IS',
-    'BURCE.IS', 'SARKY.IS'
-  ],
-
-  otomotiv: [
-    'FROTO.IS', 'TOASO.IS', 'DOAS.IS',
-    'TTRAK.IS', 'TMSN.IS', 'KARSN.IS',
-    'TSLA', 'RIVN', 'LCID'
-  ],
-
-  banka: [
-    'AKBNK.IS', 'GARAN.IS', 'YKBNK.IS',
-    'ISCTR.IS', 'HALKB.IS', 'VAKBN.IS',
-    'TSKB.IS'
-  ],
-
-  telekom: [
-    'TCELL.IS', 'TTKOM.IS',
-    'TMUS', 'CMCSA'
-  ],
-
-  havacilik: [
-    'THYAO.IS', 'PGSUS.IS',
-    'TAVHL.IS', 'CLEBI.IS',
-    'JOBY', 'BLDE'
-  ],
-
-  perakende: [
-    'BIMAS.IS', 'MGROS.IS',
-    'SOKM.IS', 'MAVI.IS',
-    'COST', 'DLTR', 'ROST', 'ULTA'
-  ],
-
-  gida: [
-    'ULKER.IS', 'CCOLA.IS',
-    'PNSUT.IS', 'TATGD.IS',
-    'PEP', 'MDLZ', 'KDP'
-  ],
-
-  temettu: [
-    'TUPRS.IS', 'EREGL.IS', 'ENKAI.IS',
-    'TCELL.IS', 'TTKOM.IS',
-    'FROTO.IS', 'BIMAS.IS',
-    'CSCO', 'TXN', 'PEP', 'AMGN'
-  ],
-
-  buyume: [
-    'MIATK.IS', 'KFEIN.IS', 'CWENE.IS',
-    'ASTOR.IS', 'SMRTG.IS', 'EUPWR.IS',
-    'NVDA', 'PLTR', 'CRWD', 'DDOG',
-    'SNOW', 'ARM', 'RIVN'
-  ],
-
-  deger: [
-    'AKBNK.IS', 'GARAN.IS', 'ISCTR.IS',
-    'YKBNK.IS', 'EREGL.IS', 'TUPRS.IS',
-    'INTC', 'PYPL', 'CSCO'
-  ],
-
-  yuksek_risk: [
-    'MIATK.IS', 'REEDR.IS', 'KATMR.IS',
-    'PAPIL.IS', 'RTALB.IS',
-    'RIVN', 'LCID', 'SOFI',
-    'PLTR', 'JOBY'
-  ]
+      teknoloji: ['ASELS.IS', 'NETAS.IS', 'KFEIN.IS', 'MIATK.IS', 'LOGO.IS', 'FONET.IS', 'ARENA.IS', 'INDES.IS', 'LINK.IS', 'PAPIL.IS', 'SMART.IS', 'ARDYZ.IS'],
+      nasdaq: ['MSFT', 'AAPL', 'ADBE', 'MDB', 'PLTR', 'INTU', 'CRWD', 'DDOG', 'SNOW', 'ORCL', 'GOOGL', 'META', 'NFLX', 'AMZN', 'SHOP'],
+      yapayzeka: ['NVDA', 'AMD', 'AVGO', 'ARM', 'MU', 'TSM', 'MRVL', 'INTC', 'QCOM', 'ASML'],
+      savunma: ['ASELS.IS', 'OTKAR.IS', 'KATMR.IS', 'PAPIL.IS', 'KTOS', 'AVAV'],
+      saglik: ['ECILC.IS', 'RTALB.IS', 'SELEC.IS', 'MEDTR.IS', 'DEVA.IS', 'LKMNH.IS', 'MPARK.IS', 'AMGN', 'GILD', 'VRTX', 'REGN', 'MRNA'],
+      enerji: ['AKSEN.IS', 'ALARK.IS', 'CWENE.IS', 'EUPWR.IS', 'ASTOR.IS', 'ENERY.IS', 'SMRTG.IS', 'ENPH', 'FSLR', 'RUN', 'BE'],
+      metal: ['EREGL.IS', 'KRDMD.IS', 'ISDMR.IS', 'BRSAN.IS', 'CEMAS.IS', 'IZMDC.IS', 'BURCE.IS', 'SARKY.IS'],
+      otomotiv: ['FROTO.IS', 'TOASO.IS', 'DOAS.IS', 'TTRAK.IS', 'TMSN.IS', 'KARSN.IS', 'TSLA', 'RIVN', 'LCID'],
+      banka: ['AKBNK.IS', 'GARAN.IS', 'YKBNK.IS', 'ISCTR.IS', 'HALKB.IS', 'VAKBN.IS', 'TSKB.IS'],
+      telekom: ['TCELL.IS', 'TTKOM.IS', 'TMUS', 'CMCSA'],
+      havacilik: ['THYAO.IS', 'PGSUS.IS', 'TAVHL.IS', 'CLEBI.IS', 'JOBY', 'BLDE'],
+      perakende: ['BIMAS.IS', 'MGROS.IS', 'SOKM.IS', 'MAVI.IS', 'COST', 'DLTR', 'ROST', 'ULTA'],
+      gida: ['ULKER.IS', 'CCOLA.IS', 'PNSUT.IS', 'TATGD.IS', 'PEP', 'MDLZ', 'KDP'],
+      temettu: ['TUPRS.IS', 'EREGL.IS', 'ENKAI.IS', 'TCELL.IS', 'TTKOM.IS', 'FROTO.IS', 'BIMAS.IS', 'CSCO', 'TXN', 'PEP', 'AMGN']
     };
 
-    const symbols = sectorPool[sector] || ['XU100.IS'];
-    
-    // Sembollerin detaylarını toplu olarak Yahoo'dan çekelim
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-    const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    res.json(response.data);
+    const symbols = sectorPool[cleanSector] || ['XU100.IS'];
+    const results = [];
+
+    await Promise.all(symbols.map(async (sym) => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=1d`;
+        const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const meta = response.data?.chart?.result?.[0]?.meta;
+        if (meta) {
+          const price = meta.regularMarketPrice;
+          const prev = meta.previousClose || price;
+          const chgPct = prev && price ? ((price - prev) / prev * 100) : 0;
+          results.push({ symbol: sym, shortName: sym.replace('.IS', ''), regularMarketPrice: price, regularMarketChangePercent: chgPct });
+        }
+      } catch (e) { /* sessiz atla */ }
+    }));
+
+    res.json({ success: true, result: results });
   } catch (error) {
     console.error("Sektör proxy hatası:", error.message);
-    res.status(500).json({ error: 'Sektör verisi çekilemedi' });
+    res.json({ success: false, result: [] });
   }
 });
 
