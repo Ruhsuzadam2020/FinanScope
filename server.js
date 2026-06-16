@@ -198,44 +198,47 @@ app.post('/api/ai-portfolio', async (req, res) => {
 // --- YENİ: Yükselenler, Düşenler ve Sektörel Veri Proxy Endpoint'leri ---
 
 // 1. En Çok Yükselenler (Gainers) - Stabil V8 Endpoint'i
+// --- YENİ: BIST GERÇEK ZAMANLI EN ÇOK YÜKSELENLER (DİNAMİK) ---
 app.get('/api/proxy/yahoo-gainers', async (req, res) => {
   try {
-    const trendPool = ['THYAO.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'SASA.IS', 'EREGL.IS', 'FROTO.IS', 'TOASO.IS', 'TUPRS.IS', 'KOCHL.IS'];
-    const results = [];
+    // Yahoo'nun BIST En Çok Yükselenler (Gainers) canlı HTML/JSON tarayıcı endpoint'i
+    const url = 'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=15&scrIds=day_gainers&regions=TR';
+    
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      }
+    });
 
-    await Promise.all(trendPool.map(async (sym) => {
-      try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=1d`;
-        const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        const meta = response.data?.chart?.result?.[0]?.meta;
-        if (meta) {
-          const price = meta.regularMarketPrice;
-          
-          // 1. KADEMELİ KORUMA: previousClose yoksa chartPreviousClose'u, o da yoksa açılış (open) fiyatını yedek alıyoruz
-          const prev = meta.previousClose || meta.chartPreviousClose || meta.open || price;
-          
-          let chgPct = 0;
-          if (prev && price && prev !== 0) {
-            chgPct = ((price - prev) / prev) * 100;
-          } else if (meta.regularMarketChangePercent !== undefined) {
-            // 2. KADEMELİ KORUMA: Hesaplama başarısız olursa Yahoo'nun kendi hazır oranını çekiyoruz
-            chgPct = meta.regularMarketChangePercent;
-          }
+    // Yahoo screener'dan dönen dinamik hisse listesi
+    const quotes = response.data?.finance?.result?.[0]?.quotes || [];
+    
+    if (!quotes.length) {
+      return res.json({ success: true, result: [] });
+    }
 
-          results.push({ 
-            symbol: sym, 
-            shortName: sym.replace('.IS', ''), 
-            regularMarketPrice: price, 
-            regularMarketChangePercent: chgPct 
-          });
-        }
-      } catch (e) { /* Hata veren sembolü sessizce atla */ }
-    }));
+    // Gelen ham veriyi frontend'in anlayacağı temiz formata dönüştürüyoruz
+    const results = quotes.map(q => {
+      const price = q.regularMarketPrice || 0;
+      const chgPct = q.regularMarketChangePercent || 0;
 
+      return {
+        symbol: q.symbol,
+        shortName: q.shortName || q.symbol.replace('.IS', ''),
+        regularMarketPrice: price,
+        regularMarketChangePercent: chgPct
+      };
+    });
+
+    // Oranları büyükten küçüğe garantiye alarak sırala
     results.sort((a, b) => b.regularMarketChangePercent - a.regularMarketChangePercent);
+
     res.json({ success: true, result: results });
+
   } catch (error) {
-    res.json({ success: false, result: [] }); // 500 fırlatıp uygulamayı çökertmesini engelledik
+    console.error("Dinamik Gainers hatası:", error.message);
+    res.json({ success: false, result: [] });
   }
 });
 
