@@ -241,6 +241,26 @@ app.get('/api/proxy/yahoo-gainers', async (req, res) => {
     res.json({ success: false, result: [] });
   }
 });
+// --- YENİ: BIST GERÇEK ZAMANLI EN ÇOK DÜŞENLER (DİNAMİK) ---
+app.get('/api/proxy/yahoo-losers', async (req, res) => {
+  try {
+    const url = 'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=15&scrIds=day_losers&regions=TR';
+    const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }});
+    const quotes = response.data?.finance?.result?.[0]?.quotes || [];
+    
+    const results = quotes.map(q => ({
+      symbol: q.symbol,
+      shortName: q.shortName || q.symbol.replace('.IS', ''),
+      regularMarketPrice: q.regularMarketPrice || 0,
+      regularMarketChangePercent: q.regularMarketChangePercent || 0
+    }));
+
+    results.sort((a, b) => a.regularMarketChangePercent - b.regularMarketChangePercent); // En çok düşen en üstte
+    res.json({ success: true, result: results });
+  } catch (error) {
+    res.json({ success: false, result: [] });
+  }
+});
 
 // 2. Sektör bazlı sembolleri getiren dinamik listeleme - Stabil V8 Endpoint'i
 app.get('/api/proxy/yahoo-sector', async (req, res) => {
@@ -250,6 +270,7 @@ app.get('/api/proxy/yahoo-sector', async (req, res) => {
   try {
     const sectorPool = {
       teknoloji: ['ASELS.IS', 'NETAS.IS', 'KFEIN.IS', 'MIATK.IS', 'LOGO.IS', 'FONET.IS', 'ARENA.IS', 'INDES.IS', 'LINK.IS', 'PAPIL.IS', 'SMART.IS', 'ARDYZ.IS'],
+      kripto: ['BTC-USD', 'ETH-USD', 'BNB-USD', 'SOL-USD', 'XRP-USD', 'ADA-USD', 'AVAX-USD', 'DOGE-USD', 'DOT-USD', 'LINK-USD', 'MATIC-USD', 'TRX-USD', 'LTC-USD', 'BCH-USD', 'UNI-USD'],
       nasdaq: ['MSFT', 'AAPL', 'ADBE', 'MDB', 'PLTR', 'INTU', 'CRWD', 'DDOG', 'SNOW', 'ORCL', 'GOOGL', 'META', 'NFLX', 'AMZN', 'SHOP'],
       yapayzeka: ['NVDA', 'AMD', 'AVGO', 'ARM', 'MU', 'TSM', 'MRVL', 'INTC', 'QCOM', 'ASML'],
       savunma: ['ASELS.IS', 'OTKAR.IS', 'KATMR.IS', 'PAPIL.IS', 'KTOS', 'AVAV'],

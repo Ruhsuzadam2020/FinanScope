@@ -1115,10 +1115,10 @@ async function fetchStockStats(sym) {
     grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted); font-size:12px; padding: 20px 0;">Bu varlık için temel analiz verisi bulunamadı.</div>`;
   }
 }
-
+// ── PİYASA FİLTRELEME VE YAYVAN (GRID) GÖRÜNÜM YÖNETİMİ ─────────────────
 
 async function filterMarketView(type, element) {
-  const cleanType = (type || '').trim(); // HTML'deki gereksiz boşlukları temizle
+  const cleanType = (type || '').trim();
   document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter'));
   if (element) element.classList.add('active-filter');
 
@@ -1137,34 +1137,45 @@ async function filterMarketView(type, element) {
     let title = "";
     let icon = "📂";
     let endpointUrl = "";
+    let baseKey = "bist"; // Alt etiketi düzeltmek için (BIST, ABD, Kripto)
 
     if (cleanType === 'gainers') {
-      title = "En Çok Yükselen Trendler";
+      title = "En Çok Yükselenler (BİST)";
       icon = "🚀";
       endpointUrl = `${API_BASE}/api/proxy/yahoo-gainers`;
+      baseKey = "bist";
+    } else if (cleanType === 'losers') {
+      title = "En Çok Düşenler (BİST)";
+      icon = "🔻";
+      endpointUrl = `${API_BASE}/api/proxy/yahoo-losers`;
+      baseKey = "bist";
     } else {
-      // Index.html'e eklenen TÜM yeni sektörler burada tanımlandı
       const sectorNames = { 
-        teknoloji: "BİST Teknoloji", nasdaq: "NASDAQ Teknoloji", yapayzeka: "Yapay Zeka & Çip", 
-        savunma: "Savunma Sanayi", saglik: "Sağlık Hisseleri", enerji: "Enerji Hisseleri", 
-        metal: "Metal & Sanayi", otomotiv: "Otomotiv Hisseleri", banka: "Bankacılık", 
-        telekom: "Telekomünikasyon", havacilik: "Havacılık", perakende: "Perakende", 
-        gida: "Gıda", temettu: "Temettü Hisseleri" 
+        kripto: "Kripto Paralar", teknoloji: "BİST Teknoloji", nasdaq: "NASDAQ Teknoloji", 
+        yapayzeka: "Yapay Zeka & Çip", savunma: "Savunma Sanayi", saglik: "Sağlık Hisseleri", 
+        enerji: "Enerji Hisseleri", metal: "Metal & Sanayi", otomotiv: "Otomotiv Hisseleri", 
+        banka: "Bankacılık", telekom: "Telekomünikasyon", havacilik: "Havacılık", 
+        perakende: "Perakende", gida: "Gıda", temettu: "Temettü Hisseleri" 
       };
       const sectorIcons = { 
-        teknoloji: "💻", nasdaq: "📈", yapayzeka: "🤖", savunma: "🛡️", saglik: "🩺", 
-        enerji: "⚡", metal: "🏭", otomotiv: "🚗", banka: "🏦", telekom: "📡", 
-        havacilik: "✈️", perakende: "🛒", gida: "🍔", temettu: "💰" 
+        kripto: "₿", teknoloji: "💻", nasdaq: "📈", yapayzeka: "🤖", savunma: "🛡️", 
+        saglik: "🩺", enerji: "⚡", metal: "🏭", otomotiv: "🚗", banka: "🏦", 
+        telekom: "📡", havacilik: "✈️", perakende: "🛒", gida: "🍔", temettu: "💰" 
       };
       
       title = sectorNames[cleanType] || cleanType.toUpperCase();
       icon = sectorIcons[cleanType] || "📂";
       endpointUrl = `${API_BASE}/api/proxy/yahoo-sector?sector=${cleanType}`;
+      
+      // Hisselerin altındaki etiketin "Emtia" olmasını engellemek için doğru piyasayı atıyoruz
+      if (cleanType === 'kripto') baseKey = 'cripto';
+      else if (['nasdaq', 'yapayzeka'].includes(cleanType)) baseKey = 'us';
+      else baseKey = 'bist';
     }
 
     const res = await fetch(endpointUrl);
     const data = await res.json();
-    const quotes = data?.result || []; // Yeni backend yapısına uyarlandı
+    const quotes = data?.result || [];
 
     if (!quotes.length) {
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p class="es-text">Bu kategoriye ait aktif canlı veri bulunamadı.</p></div>`;
@@ -1175,29 +1186,41 @@ async function filterMarketView(type, element) {
       const change = q.regularMarketChangePercent || 0;
       return {
         text: q.shortName || q.symbol,
-        lastprice: q.regularMarketPrice ? q.regularMarketPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+        lastprice: q.regularMarketPrice ? q.regularMarketPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
         rate: change.toFixed(2),
         _sym: q.symbol
       };
     });
 
-    const filterResult = {
-      dynamicSection: {
-        key: cleanType,
-        label: title,
-        icon: icon,
-        items: formattedItems
-      }
-    };
+    if (cleanType === 'gainers') {
+      formattedItems.sort((a, b) => parseFloat(b.rate) - parseFloat(a.rate));
+    } else if (cleanType === 'losers') {
+      formattedItems.sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate)); // Eksiler en üste
+    }
 
-    renderMarkets({ endpoints: [], results: filterResult });
+    // ── ÇÖZÜM BURADA: EKRANI YAYVAN YAPMAK İÇİN VERİLERİ 5'Lİ KARTLARA BÖLÜYORUZ ──
+    const chunkSize = 5;
+    const chunkedResults = {};
+    
+    for (let i = 0; i < formattedItems.length; i += chunkSize) {
+      const chunk = formattedItems.slice(i, i + chunkSize);
+      const pageIndex = Math.floor(i / chunkSize) + 1;
+      
+      chunkedResults[`section_${pageIndex}`] = {
+        key: baseKey, // Bu sayede renderMarkets fonksiyonu BIST, Kripto veya ABD etiketini doğru yazar
+        label: `${title} - Bölüm ${pageIndex}`,
+        icon: icon,
+        items: chunk
+      };
+    }
+
+    renderMarkets({ endpoints: [], results: chunkedResults });
 
   } catch (error) {
     console.error("Filtreleme hatası:", error);
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p class="es-text">Veriler yüklenirken bir ağ hatası oluştu.</p></div>`;
   }
 }
-
 // ── BAŞLANGIÇ ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const mobileInp = document.getElementById('mobile-search-input');
