@@ -494,6 +494,24 @@ body.analysis-mode .side-panel { display: flex; }
 .cp-down { background: var(--down-bg); color: var(--down); }
 .cp-flat { background: var(--border-light); color: var(--text-muted); }
 
+.filter-btn {
+  background: var(--bg-card, #ffffff);
+  color: var(--text-main, #333);
+  border: 1px solid var(--border-light, #dde3ec);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.filter-btn:hover { background: var(--border-light, #dde3ec); }
+.filter-btn.active-filter {
+  background: #0066ff;
+  color: #fff;
+  border-color: #0066ff;
+}
+
 /* ── 13. ANALYSIS ─────────────────────────────────────────── */
 .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
 

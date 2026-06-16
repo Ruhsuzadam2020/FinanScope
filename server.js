@@ -193,6 +193,144 @@ app.post('/api/ai-portfolio', async (req, res) => {
   }
 });
 
+// --- YENİ: Yükselenler, Düşenler ve Sektörel Veri Proxy Endpoint'leri ---
+
+// 1. En Çok Yükselenler (Gainers)
+app.get('/api/proxy/yahoo-gainers', async (req, res) => {
+  try {
+    // BIST için en çok yükselen trendleri tarar
+    const url = 'https://query1.finance.yahoo.com/v1/finance/trending/TR';
+    const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Gainers hatası:", error.message);
+    res.status(500).json({ error: 'Veri çekilemedi' });
+  }
+});
+
+// 2. Sektör bazlı sembolleri getiren dinamik listeleme
+app.get('/api/proxy/yahoo-sector', async (req, res) => {
+  const { sector } = req.query;
+  try {
+    // Kullanıcının seçtiği sektöre göre Yahoo Finance üzerinde hazır tanımlı sembol setleri veya arama sorguları üretilir
+    // Yerel örnek BIST hisselerini eşleştiren bir havuz:
+    const sectorPool = {
+      teknoloji: [
+    'ASELS.IS', 'NETAS.IS', 'KFEIN.IS', 'MIATK.IS',
+    'LOGO.IS', 'FONET.IS', 'ARENA.IS', 'INDES.IS',
+    'LINK.IS', 'PAPIL.IS', 'SMART.IS', 'ARDYZ.IS',
+    'DESPC.IS', 'DGATE.IS', 'ESCOM.IS', 'HTTBT.IS'
+  ],
+
+  nasdaq_teknoloji: [
+    'MSFT', 'AAPL', 'ADBE', 'MDB', 'PLTR', 'INTU',
+    'CRWD', 'DDOG', 'SNOW', 'ORCL', 'GOOGL',
+    'META', 'NFLX', 'AMZN', 'SHOP', 'PANW'
+  ],
+
+  yapay_zeka_cip: [
+    'NVDA', 'AMD', 'AVGO', 'ARM', 'MU',
+    'TSM', 'MRVL', 'INTC', 'QCOM', 'ASML'
+  ],
+
+  savunma: [
+    'ASELS.IS', 'OTKAR.IS', 'KATMR.IS', 'PAPIL.IS',
+    'KTOS', 'AVAV'
+  ],
+
+  saglik: [
+    'ECILC.IS', 'RTALB.IS', 'SELEC.IS', 'MEDTR.IS',
+    'DEVA.IS', 'LKMNH.IS', 'MPARK.IS',
+    'AMGN', 'GILD', 'VRTX', 'REGN', 'MRNA'
+  ],
+
+  enerji: [
+    'AKSEN.IS', 'ALARK.IS', 'CWENE.IS', 'EUPWR.IS',
+    'ASTOR.IS', 'ENERY.IS', 'SMRTG.IS',
+    'ENPH', 'FSLR', 'RUN', 'BE'
+  ],
+
+  metal: [
+    'EREGL.IS', 'KRDMD.IS', 'ISDMR.IS',
+    'BRSAN.IS', 'CEMAS.IS', 'IZMDC.IS',
+    'BURCE.IS', 'SARKY.IS'
+  ],
+
+  otomotiv: [
+    'FROTO.IS', 'TOASO.IS', 'DOAS.IS',
+    'TTRAK.IS', 'TMSN.IS', 'KARSN.IS',
+    'TSLA', 'RIVN', 'LCID'
+  ],
+
+  banka: [
+    'AKBNK.IS', 'GARAN.IS', 'YKBNK.IS',
+    'ISCTR.IS', 'HALKB.IS', 'VAKBN.IS',
+    'TSKB.IS'
+  ],
+
+  telekom: [
+    'TCELL.IS', 'TTKOM.IS',
+    'TMUS', 'CMCSA'
+  ],
+
+  havacilik: [
+    'THYAO.IS', 'PGSUS.IS',
+    'TAVHL.IS', 'CLEBI.IS',
+    'JOBY', 'BLDE'
+  ],
+
+  perakende: [
+    'BIMAS.IS', 'MGROS.IS',
+    'SOKM.IS', 'MAVI.IS',
+    'COST', 'DLTR', 'ROST', 'ULTA'
+  ],
+
+  gida: [
+    'ULKER.IS', 'CCOLA.IS',
+    'PNSUT.IS', 'TATGD.IS',
+    'PEP', 'MDLZ', 'KDP'
+  ],
+
+  temettu: [
+    'TUPRS.IS', 'EREGL.IS', 'ENKAI.IS',
+    'TCELL.IS', 'TTKOM.IS',
+    'FROTO.IS', 'BIMAS.IS',
+    'CSCO', 'TXN', 'PEP', 'AMGN'
+  ],
+
+  buyume: [
+    'MIATK.IS', 'KFEIN.IS', 'CWENE.IS',
+    'ASTOR.IS', 'SMRTG.IS', 'EUPWR.IS',
+    'NVDA', 'PLTR', 'CRWD', 'DDOG',
+    'SNOW', 'ARM', 'RIVN'
+  ],
+
+  deger: [
+    'AKBNK.IS', 'GARAN.IS', 'ISCTR.IS',
+    'YKBNK.IS', 'EREGL.IS', 'TUPRS.IS',
+    'INTC', 'PYPL', 'CSCO'
+  ],
+
+  yuksek_risk: [
+    'MIATK.IS', 'REEDR.IS', 'KATMR.IS',
+    'PAPIL.IS', 'RTALB.IS',
+    'RIVN', 'LCID', 'SOFI',
+    'PLTR', 'JOBY'
+  ]
+    };
+
+    const symbols = sectorPool[sector] || ['XU100.IS'];
+    
+    // Sembollerin detaylarını toplu olarak Yahoo'dan çekelim
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
+    const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Sektör proxy hatası:", error.message);
+    res.status(500).json({ error: 'Sektör verisi çekilemedi' });
+  }
+});
+
 // 5. CollectAPI Proxy (Piyasalar)
 app.get('/api/economy/:type', async (req, res) => {
   const { type } = req.params;

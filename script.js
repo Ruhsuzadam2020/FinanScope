@@ -1116,6 +1116,97 @@ async function fetchStockStats(sym) {
   }
 }
 
+// ── YENİ: PİYASA FİLTRELEME VE SEKTÖR YÖNETİMİ ─────────────────
+
+async function filterMarketView(type, element) {
+  // Aktif buton görsel stilini güncelle
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter'));
+  if (element) element.classList.add('active-filter');
+
+  const grid = document.getElementById('markets-grid');
+  if (!grid) return;
+
+  // Yükleniyor spinner'ı göster
+  grid.innerHTML = `<div class="loading-spinner-box" style="grid-column:1/-1"><div class="spin-icon"></div><span>Veriler filtreleniyor...</span></div>`;
+
+  // Varsayılan görünüme geri dön (Tümü)
+  if (type === 'all') {
+    marketsCache = null; // Önbelleği temizle ve yeniden yükle
+    await fetchGlobalMarkets();
+    return;
+  }
+
+  try {
+    let responseData;
+    let title = "";
+    let icon = "📂";
+
+    if (type === 'gainers') {
+      title = "En Çok Yükselen Trendler";
+      icon = "🚀";
+      // Trend olan verileri çek
+      const res = await fetch(`${API_BASE}/api/proxy/yahoo-gainers`);
+      const trendingData = await res.json();
+      
+      // Sembolleri Yahoo quote endpoint'ine beslemek üzere ayrıştır
+      const trendSymbols = trendingData?.finance?.result?.[0]?.quotes?.map(q => q.symbol).slice(0, 10) || [];
+      if(trendSymbols.length === 0) trendSymbols.push('THYAO.IS', 'ASELS.IS', 'BTC-USD');
+      
+      const detailsRes = await fetch(`${API_BASE}/api/proxy/yahoo?url=${encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/quote?symbols=' + trendSymbols.join(','))}`);
+      responseData = await detailsRes.json();
+    } else {
+      // Sektörel istekler (Teknoloji, Sağlık, Metal, Otomotiv)
+      const sectorNames = { teknoloji: "Teknoloji Hisseleri", saglik: "Sağlık Hisseleri", metal: "Metal & Sanayi", otomotiv: "Otomotiv Hisseleri" };
+      const sectorIcons = { teknoloji: "💻", saglik: "🩺", metal: "🏭", otomotiv: "🚗" };
+      title = sectorNames[type];
+      icon = sectorIcons[type];
+
+      const res = await fetch(`${API_BASE}/api/proxy/yahoo-sector?sector=${type}`);
+      responseData = await res.json();
+    }
+
+    const quotes = responseData?.quoteResponse?.result || [];
+
+    if (!quotes.length) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p class="es-text">Bu kategoriye ait aktif canlı veri bulunamadı.</p></div>`;
+      return;
+    }
+
+    // Gelen veriyi arayüz formatına haritalandır (Map)
+    const formattedItems = quotes.map(q => {
+      const change = q.regularMarketChangePercent || 0;
+      return {
+        text: q.shortName || q.symbol.replace('.IS', ''),
+        lastprice: q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : '-',
+        rate: change >= 0 ? change.toFixed(2) : change.toFixed(2),
+        _sym: q.symbol
+      };
+    });
+
+    // Eğer "Yükselenler" seçildiyse yüksek yüzdenin en üstte kalması için sırala
+    if (type === 'gainers') {
+      formattedItems.sort((a, b) => parseFloat(b.rate) - parseFloat(a.rate));
+    }
+
+    // Ekrana basılacak sahte bir dinamik sonuç objesi üret
+    const filterResult = {
+      dynamicSection: {
+        key: type,
+        label: title,
+        icon: icon,
+        items: formattedItems
+      }
+    };
+
+    // Mevcut renderMarkets fonksiyonunu tetikle
+    renderMarkets({ endpoints: [], results: filterResult });
+
+  } catch (error) {
+    console.error("Filtreleme hatası:", error);
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p class="es-text">Veriler yüklenirken bir hata oluştu.</p></div>`;
+  }
+}
+
 // ── BAŞLANGIÇ ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const mobileInp = document.getElementById('mobile-search-input');
