@@ -210,9 +210,24 @@ app.get('/api/proxy/yahoo-gainers', async (req, res) => {
         const meta = response.data?.chart?.result?.[0]?.meta;
         if (meta) {
           const price = meta.regularMarketPrice;
-          const prev = meta.previousClose || price;
-          const chgPct = prev && price ? ((price - prev) / prev * 100) : 0;
-          results.push({ symbol: sym, shortName: sym.replace('.IS', ''), regularMarketPrice: price, regularMarketChangePercent: chgPct });
+          
+          // 1. KADEMELİ KORUMA: previousClose yoksa chartPreviousClose'u, o da yoksa açılış (open) fiyatını yedek alıyoruz
+          const prev = meta.previousClose || meta.chartPreviousClose || meta.open || price;
+          
+          let chgPct = 0;
+          if (prev && price && prev !== 0) {
+            chgPct = ((price - prev) / prev) * 100;
+          } else if (meta.regularMarketChangePercent !== undefined) {
+            // 2. KADEMELİ KORUMA: Hesaplama başarısız olursa Yahoo'nun kendi hazır oranını çekiyoruz
+            chgPct = meta.regularMarketChangePercent;
+          }
+
+          results.push({ 
+            symbol: sym, 
+            shortName: sym.replace('.IS', ''), 
+            regularMarketPrice: price, 
+            regularMarketChangePercent: chgPct 
+          });
         }
       } catch (e) { /* Hata veren sembolü sessizce atla */ }
     }));
@@ -257,9 +272,24 @@ app.get('/api/proxy/yahoo-sector', async (req, res) => {
         const meta = response.data?.chart?.result?.[0]?.meta;
         if (meta) {
           const price = meta.regularMarketPrice;
-          const prev = meta.previousClose || price;
-          const chgPct = prev && price ? ((price - prev) / prev * 100) : 0;
-          results.push({ symbol: sym, shortName: sym.replace('.IS', ''), regularMarketPrice: price, regularMarketChangePercent: chgPct });
+          
+          // 1. KADEMELİ KORUMA: previousClose yoksa chartPreviousClose'u, o da yoksa açılış (open) fiyatını yedek alıyoruz
+          const prev = meta.previousClose || meta.chartPreviousClose || meta.open || price;
+          
+          let chgPct = 0;
+          if (prev && price && prev !== 0) {
+            chgPct = ((price - prev) / prev) * 100;
+          } else if (meta.regularMarketChangePercent !== undefined) {
+            // 2. KADEMELİ KORUMA: Hesaplama başarısız olursa Yahoo'nun kendi hazır oranını çekiyoruz
+            chgPct = meta.regularMarketChangePercent;
+          }
+
+          results.push({ 
+            symbol: sym, 
+            shortName: sym.replace('.IS', ''), 
+            regularMarketPrice: price, 
+            regularMarketChangePercent: chgPct 
+          });
         }
       } catch (e) { /* sessiz atla */ }
     }));
